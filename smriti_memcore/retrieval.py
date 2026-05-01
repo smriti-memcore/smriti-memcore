@@ -70,8 +70,34 @@ class RetrievalEngine:
         top_k = top_k or self.config.retrieval_top_k
         start_time = time.time()
 
-        # 1. Navigate palace — multi-hop associative search
-        candidates = self.palace.search(query, top_k=top_k * 2, max_hops=max_hops)
+        # Step 1a — vector search (wider pool: top_k*3)
+        vector_candidates = self.palace.search(query, top_k=top_k * 3, max_hops=max_hops)
+
+        if self.fts_index is not None:
+            # Step 1b — FTS keyword search
+            try:
+                fts_results = self.fts_index.search(query, top_k=top_k * 3)
+            except Exception:
+                logger.warning("FTS search failed — falling back to vector-only retrieval")
+                fts_results = []
+
+            # Step 1c — RRF merge → ordered list of IDs
+            merged_ids = self._rrf_merge(
+                vector_candidates, fts_results, pool_size=top_k * 2
+            )
+
+            # Step 1d — reconstruct Memory objects; fetch FTS-only IDs from palace
+            id_map: Dict[str, Memory] = {m.id: m for m in vector_candidates}
+            candidates: List[Memory] = []
+            for mid in merged_ids:
+                if mid in id_map:
+                    candidates.append(id_map[mid])
+                else:
+                    mem = self.palace.get_memory(mid)
+                    if mem is not None:
+                        candidates.append(mem)
+        else:
+            candidates = vector_candidates[: top_k * 2]
 
         if not candidates:
             logger.debug(f"No memories found for query: {query[:60]}...")
