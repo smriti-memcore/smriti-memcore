@@ -80,3 +80,29 @@ class TestRRFMerge:
             pool_size=10,
         )
         assert merged.index(both.id) < merged.index(fts_only.id)
+
+
+class TestHybridSearchEndToEnd:
+    def test_exact_term_found_in_hybrid_results(self, tmp_dir):
+        from smriti_memcore.core import SMRITI
+        from smriti_memcore.models import MemorySource, SmritiConfig
+
+        config = SmritiConfig(storage_path=tmp_dir)
+        smriti = SMRITI(config=config)
+
+        smriti.encode(
+            "ticket YEP-293 causes auth regression in login flow",
+            source=MemorySource.USER_STATED,
+            use_llm=False,
+        )
+        for i in range(10):
+            smriti.encode(
+                f"unrelated topic about thing number {i}",
+                source=MemorySource.USER_STATED,
+                use_llm=False,
+            )
+
+        results = smriti.recall("YEP-293", top_k=5)
+        assert any("YEP-293" in m.content for m in results), \
+            "Hybrid search must find YEP-293 in top-5"
+        smriti.close()

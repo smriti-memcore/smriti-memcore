@@ -25,6 +25,7 @@ from smriti_memcore.retrieval import RetrievalEngine
 from smriti_memcore.consolidation import ConsolidationEngine
 from smriti_memcore.meta_memory import MetaMemory
 from smriti_memcore.metrics import SmritiMetrics
+from smriti_memcore.fts_index import FTSIndex
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,15 @@ class SMRITI:
             storage_path=os.path.join(self.config.storage_path, "palace"),
         )
 
+        # FTS index — expendable derived index, self-heals via rebuild
+        self.fts_index = FTSIndex(self.config.storage_path)
+        active_memories = [
+            m for m in self.palace.memories.values()
+            if m.status == MemoryStatus.ACTIVE
+        ]
+        if self.fts_index.needs_rebuild(len(active_memories)):
+            self.fts_index.rebuild(active_memories)
+
         self.working_memory = WorkingMemory(
             max_slots=self.config.working_memory_slots,
             active_chunks=self.config.active_chunks,
@@ -94,6 +104,7 @@ class SMRITI:
             working_memory=self.working_memory,
             vector_store=self.vector_store,
             config=self.config,
+            fts_index=self.fts_index,
         )
 
         self.consolidation_engine = ConsolidationEngine(
@@ -160,6 +171,11 @@ class SMRITI:
         )
 
         room = self.palace.place_memory(memory)
+
+        try:
+            self.fts_index.add(memory.id, content)
+        except Exception as e:
+            logger.warning(f"FTS add failed for {memory.id}: {e}")
 
         # 4. Auto-consolidate if buffer is getting full
         if self.episode_buffer.unconsolidated_count >= self.config.episode_buffer_trigger:
@@ -274,6 +290,7 @@ class SMRITI:
         memory = self.palace.get_memory(memory_id)
         if memory:
             memory.status = MemoryStatus.ARCHIVED
+            self.fts_index.remove(memory_id)
             logger.info(f"Explicitly forgotten: {memory_id}")
 
     def resolve_conflict(self, mem_a_id: str, mem_b_id: str, strategy: str = "temporal"):
@@ -383,6 +400,7 @@ class SMRITI:
         except Exception as e:
             logger.error(f"Error during save on close: {e}")
         self.episode_buffer.close()
+        self.fts_index.close()
         self._closed = True
         # Unregister atexit handler since we cleaned up
         try:
@@ -396,6 +414,10 @@ class SMRITI:
         if not self._closed:
             try:
                 self.save()
+            except Exception:
+                pass
+            try:
+                self.fts_index.close()
             except Exception:
                 pass
 
