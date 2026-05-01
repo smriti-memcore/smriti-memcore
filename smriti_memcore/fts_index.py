@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sqlite3
 from typing import List, Tuple
 
@@ -77,10 +78,13 @@ class FTSIndex:
             )
 
     def search(self, query: str, top_k: int = 20) -> List[Tuple[str, float]]:
+        clean_query = re.sub(r'[^\w\s]', ' ', query).strip()
+        if not clean_query:
+            return []
         rows = self._conn.execute(
             "SELECT memory_id, bm25(memories) FROM memories "
             "WHERE memories MATCH ? ORDER BY bm25(memories) LIMIT ?",
-            (query, top_k),
+            (clean_query, top_k),
         ).fetchall()
         return [(row[0], row[1]) for row in rows]
 
