@@ -86,7 +86,7 @@ class FTSIndex:
         # interpreted as query syntax (bm25 returns negative values; ORDER BY rank
         # is the conventional FTS5 idiom for ascending-relevance sort).
         clean_query = re.sub(r'[^\w\s]', ' ', query).strip()
-        tokens = [t for t in clean_query.split() if t.upper() not in _FTS5_OPERATORS]
+        tokens = [t for t in clean_query.split() if t not in _FTS5_OPERATORS]
         if not tokens:
             return []
         clean_query = ' '.join(tokens)
