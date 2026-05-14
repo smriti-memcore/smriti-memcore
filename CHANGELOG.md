@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - FastMCP server description updated to reflect 18 total tools and AMP conformance level
 
+## [1.1.0] - 2026-05-13
+
+### Added
+- **Hybrid FTS5+RRF Search** — `FTSIndex` SQLite FTS5 wrapper with idempotent rebuild and atomic writes; `RetrievalEngine` fuses FTS and vector results via Reciprocal Rank Fusion; FTS connection closed cleanly on `smriti.close()`; FTS index resynced after consolidation
+- Stop-word filtering and FTS5 operator sanitisation for natural-language query strings
+- Hybrid search benchmark (`benchmarks/bench_hybrid_search.py`) comparing vector-only vs FTS+RRF modes
+- `--llm`/`--llm-model` flags for `longmem_eval` to support remote LLM providers alongside Ollama
+
 ## [1.0.1] - 2026-04-05
 
 ### Fixed
