@@ -48,6 +48,12 @@ class ConsolidationDepth(Enum):
     DEFER = "defer"     # Too busy, schedule for later
 
 
+class Visibility(str, Enum):
+    """Whether a memory or room can be shared in team consolidation."""
+    PRIVATE = "private"   # Never leaves this user's palace
+    SHARED = "shared"     # Eligible for team-level consolidation sync
+
+
 class DecisionType(Enum):
     """Meta-memory decision on how to handle a query."""
     RECALL_CONFIDENTLY = "recall_confidently"
@@ -130,6 +136,9 @@ class Memory:
     # Conflict tracking
     superseded_by: Optional[str] = None
 
+    # Visibility — controls team consolidation sync eligibility
+    visibility: Visibility = field(default_factory=lambda: Visibility.SHARED)
+
     # Retrieval metadata (transient, not persisted)
     retrieval_score: float = 0.0
     hops: int = 0
@@ -175,6 +184,8 @@ class Memory:
             "consecutive_successful_reviews": self.consecutive_successful_reviews,
             # Conflict tracking
             "superseded_by": self.superseded_by,
+            # Visibility
+            "visibility": self.visibility.value,
         }
 
 

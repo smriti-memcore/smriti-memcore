@@ -66,11 +66,11 @@ The script will:
 
 **Then restart Claude Code.** Verify with `/mcp` — `smriti` should appear as connected.
 
-**Available tools (18: 12 native + 6 AMP v1.0 aliases):**
+**Available tools (19: 13 native + 6 AMP v1.0 aliases):**
 
 | Tool | Description |
 |---|---|
-| `smriti_encode` | Store information in long-term memory |
+| `smriti_encode` | Store information in long-term memory (`private=True` keeps it out of team sync) |
 | `smriti_recall` | Retrieve memories by natural-language query |
 | `smriti_get_context` | Inject working memory into the current prompt |
 | `smriti_how_well_do_i_know` | Confidence check on a topic |
@@ -78,8 +78,9 @@ The script will:
 | `smriti_pin` | Mark a memory as permanent (never decayed) |
 | `smriti_forget` | Archive a memory |
 | `smriti_consolidate` | Run a consolidation cycle |
-| `smriti_stats` | System-wide statistics |
+| `smriti_stats` | System-wide statistics (includes private/shared memory counts) |
 | `smriti_get_suggestions` | Proactive insights from background consolidation |
+| `smriti_create_private_room` | Create a private semantic room — memories in it are excluded from team consolidation sync |
 | `smriti_open_ui` | Launch the visual Memory Browser in the default web browser |
 | `smriti_sync_obsidian` | Export the Semantic Palace to an Obsidian vault |
 
@@ -87,7 +88,7 @@ The script will:
 
 | AMP Tool | Maps to |
 |---|---|
-| `amp.encode` | `smriti_encode` — with `agent_id` + `force` params, AMP response schema |
+| `amp.encode` | `smriti_encode` — with `agent_id` + `force` + `private` params, AMP response schema |
 | `amp.recall` | `smriti_recall` — returns `{results: [{id, content, score, timestamp, status}]}` |
 | `amp.forget` | `smriti_forget` — returns `{status: "forgotten" \| "not_found"}` |
 | `amp.stats` | `smriti_stats` — returns `{memory_count, ...}` |
@@ -348,6 +349,14 @@ config = SmritiConfig(
 
 ---
 
+## What's New in v1.3.0
+
+- **Private rooms** — `smriti_create_private_room(topic)` creates a semantic room whose memories are excluded from team consolidation sync
+- **`private=True` on encode** — `smriti_encode` and `amp.encode` now accept `private=True`; Claude uses this when you say *"remember this privately"*
+- **`Visibility` field on memories and rooms** — `"private"` | `"shared"`; default is `"shared"`. Private memories are still recalled by the owner — privacy only controls team sync eligibility
+- **AMP spec updated** — `visibility` field added to `MemoryResult`, `private` param added to `amp.encode`, `visibility` filter added to `amp.recall` filters schema
+- **palace.json schema v2** — automatic migration on first load; all existing memories and rooms default to `"shared"`
+
 ## What's New in v1.2.0
 
 - **AMP v1.0 Full conformance** — MCP server now exposes all 6 AMP verbs (`amp.encode`, `amp.recall`, `amp.forget`, `amp.stats`, `amp.pin`, `amp.consolidate`) alongside the existing `smriti_*` tools. Passes all 25 AMP compliance tests (Core + Full).
@@ -453,9 +462,9 @@ smriti-memcore/
 │   ├── metrics.py         # Observability: counters, gauges, histograms, Prometheus export
 │   └── integrations/      # Framework adapters
 │       ├── langchain_memory.py  # LangChain BaseMemory component
-│       └── mcp_server.py        # Claude Code MCP server (18 tools: 12 smriti_* + 6 AMP aliases)
+│       └── mcp_server.py        # Claude Code MCP server (19 tools: 13 smriti_* + 6 AMP aliases)
 ├── install_smriti_mcp.sh   # One-command Claude Code setup
-├── tests/                 # 190 tests across 14 files
+├── tests/                 # 246 tests across 15 files
 ├── baselines/             # Baseline implementations for comparison
 ├── benchmarks/            # Benchmark harness & scripts
 ├── examples/              # Usage examples
