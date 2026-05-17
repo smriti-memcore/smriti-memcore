@@ -36,6 +36,7 @@ from smriti_memcore.models import (
     MemoryStatus,
     Modality,
     SmritiConfig,
+    Visibility,
 )
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,7 @@ def serialize_memory(memory: Memory) -> Dict[str, Any]:
         "source": memory.source.value,
         "modality": memory.modality.value,
         "status": memory.status.value,
+        "visibility": memory.visibility.value,
         "creation_time": memory.creation_time.isoformat(),
         "last_accessed": memory.last_accessed.isoformat(),
         "access_count": memory.access_count,
@@ -116,6 +118,7 @@ def smriti_encode(
     content: str,
     source: str = "direct",
     modality: str = "text",
+    private: bool = False,
 ) -> Dict[str, Any]:
     """
     Encode information into SMRITI long-term memory.
@@ -126,6 +129,7 @@ def smriti_encode(
     source: "direct" (default), "user_stated" (highest trust, confidence=1.0),
             "inferred", or "external"
     modality: "text" (default), "code", "image", "structured"
+    private: if True, memory is marked private and excluded from team consolidation sync
     """
     try:
         mem_source = MemorySource(source)
@@ -140,8 +144,11 @@ def smriti_encode(
         memory_id = _smriti.encode(content, source=mem_source, modality=mem_modality)
         if memory_id is None:
             return {"memory_id": None, "status": "discarded"}
+        mem = _smriti.palace.memories.get(memory_id)
+        if private and mem:
+            mem.visibility = Visibility.PRIVATE
         _smriti.save()
-        return {"memory_id": memory_id}
+        return {"memory_id": memory_id, "visibility": mem.visibility.value if mem else "shared"}
     except Exception as e:
         logger.error(f"smriti_encode failed: {e}")
         return {"error": str(e)}
@@ -266,6 +273,27 @@ def smriti_forget(memory_id: str) -> Dict[str, Any]:
 
 
 @mcp_server.tool()
+def smriti_create_private_room(topic: str) -> Dict[str, Any]:
+    """
+    Create a private semantic room in the palace.
+
+    The room itself is marked private. Use this to organise a topic that should
+    never be promoted to team-level consolidation sync. To store a private memory,
+    encode it with private=True — room visibility is not automatically inherited
+    by memories at encode time.
+
+    Returns {"room_id": ..., "topic": ..., "visibility": "private"}.
+    """
+    try:
+        room = _smriti.palace.create_room(topic)
+        room.visibility = Visibility.PRIVATE
+        _smriti.save()
+        return {"room_id": room.id, "topic": room.topic, "visibility": "private"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@mcp_server.tool()
 def smriti_consolidate(depth: str = "light") -> Dict[str, Any]:
     """
     Run a consolidation cycle to organize and strengthen memories.
@@ -319,9 +347,20 @@ def smriti_stats() -> Dict[str, Any]:
     Returns a nested dict with 8 top-level keys:
     palace, working_memory, retrieval, consolidation, meta_memory,
     episode_buffer, vector_store, metrics.
+    Also includes visibility counts (private_memories, shared_memories) in palace.
     """
     try:
-        return _smriti.stats()
+        result = _smriti.stats()
+        memories = _smriti.palace.memories.values()
+        result["palace"]["private_memories"] = sum(
+            1 for m in memories
+            if m.visibility == Visibility.PRIVATE and m.status == MemoryStatus.ACTIVE
+        )
+        result["palace"]["shared_memories"] = sum(
+            1 for m in memories
+            if m.visibility == Visibility.SHARED and m.status == MemoryStatus.ACTIVE
+        )
+        return result
     except Exception as e:
         return {"error": str(e)}
 
@@ -441,11 +480,13 @@ def amp_encode(
     content: str,
     force: bool = False,
     source: str = "direct",
+    private: bool = False,
 ) -> Dict[str, Any]:
     """
     Store a new memory for an agent. (AMP Core verb)
 
     force=True bypasses the salience gate and always stores.
+    private=True marks the memory as private (excluded from team consolidation sync).
     Returns {status: "stored", id: "..."} or {status: "below_threshold"}.
     """
     if not content or not content.strip():
@@ -459,8 +500,11 @@ def amp_encode(
         memory_id = _smriti.encode(content, source=mem_source, use_llm=not force)
         if memory_id is None:
             return {"status": "below_threshold"}
+        mem = _smriti.palace.memories.get(memory_id)
+        if private and mem:
+            mem.visibility = Visibility.PRIVATE
         _smriti.save()
-        return {"status": "stored", "id": memory_id}
+        return {"status": "stored", "id": memory_id, "visibility": mem.visibility.value if mem else "shared"}
     except Exception as e:
         logger.error(f"amp.encode failed: {e}")
         return {"error": str(e), "amp_error_code": "backend_error"}

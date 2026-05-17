@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`Visibility` enum** (`private` / `shared`) on `Memory` and `Room` — controls team consolidation sync eligibility
+- `private=True` parameter on `smriti_encode` and `amp.encode` — Claude marks a memory private when the user requests it
+- `smriti_create_private_room(topic)` MCP tool — creates a room with `visibility=PRIVATE`; memories placed in it are personal and excluded from team sync
+- `SemanticPalace.shared_memories()` helper — returns only `ACTIVE` + `SHARED` memories for safe use by team consolidation
+- Visibility counts (`private_memories`, `shared_memories`) in `smriti_stats` output
+
+### Changed
+- `PALACE_SCHEMA_VERSION` bumped to `2`; v1→v2 migration sets all existing memories and rooms to `shared` on first load
+- Conflict resolution in consolidation skips private memories (personal context is not subject to cross-memory contradiction resolution)
+
+### Note
+- Team sync enforcement (blocking private memories from flowing to a team palace) is an enterprise feature; the privacy primitives (`Visibility` enum, `private=True`, `shared_memories()`) are open source
+
 ## [1.2.0] - 2026-05-13
 
 ### Added

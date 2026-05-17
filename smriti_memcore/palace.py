@@ -17,10 +17,12 @@ from typing import Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
-from smriti_memcore.models import Memory, MemoryStatus
+from smriti_memcore.models import Memory, MemoryStatus, Visibility
 from smriti_memcore.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
+
+PALACE_SCHEMA_VERSION = 2
 
 
 @dataclass
@@ -32,6 +34,7 @@ class Room:
     visit_count: int = 0
     last_visited: datetime = field(default_factory=datetime.now)
     memory_ids: List[str] = field(default_factory=list)
+    visibility: Visibility = field(default_factory=lambda: Visibility.SHARED)
 
     def to_dict(self) -> dict:
         return {
@@ -41,6 +44,7 @@ class Room:
             "last_visited": self.last_visited.isoformat(),
             "memory_ids": self.memory_ids,
             "memory_count": len(self.memory_ids),
+            "visibility": self.visibility.value,
         }
 
 
@@ -379,7 +383,33 @@ class SemanticPalace:
                 metadata={"type": "room", "topic": room.topic},
             )
 
+    def shared_memories(self) -> List[Memory]:
+        """Return only ACTIVE + SHARED memories — safe for team consolidation sync."""
+        return [
+            m for m in self.memories.values()
+            if m.status == MemoryStatus.ACTIVE and m.visibility == Visibility.SHARED
+        ]
+
     # ── Persistence ──────────────────────────────────────
+
+    @staticmethod
+    def _migrate(state: dict) -> dict:
+        """Upgrade palace state dict to PALACE_SCHEMA_VERSION in-place."""
+        version = state.get("schema_version", 0)
+        if version == PALACE_SCHEMA_VERSION:
+            return state
+        if version < 1:
+            # v0→v1 was never shipped; all pre-versioned files are treated as v0
+            # and fall through to the v2 migration below which handles them fully.
+            logger.info("Migrating palace from schema v0 → v1 (no-op; handled by v2 migration)")
+        if version < 2:
+            logger.info("Migrating palace from schema v1 → v2 (adding visibility field)")
+            for r in state.get("rooms", {}).values():
+                r.setdefault("visibility", "shared")
+            for m in state.get("memories", {}).values():
+                m.setdefault("visibility", "shared")
+        state["schema_version"] = PALACE_SCHEMA_VERSION
+        return state
 
     def save(self, path: Optional[str] = None):
         """Save palace state to disk."""
@@ -394,6 +424,7 @@ class SemanticPalace:
             all_edges.extend(e.to_dict() for e in edges)
 
         state = {
+            "schema_version": PALACE_SCHEMA_VERSION,
             "rooms": {rid: r.to_dict() for rid, r in self.rooms.items()},
             "edges": all_edges,
             "landmarks": self.landmarks,
@@ -419,6 +450,8 @@ class SemanticPalace:
             with open(palace_file, "r") as f:
                 state = json.load(f)
 
+            state = self._migrate(state)
+
             # Reconstruct rooms
             for rid, rdata in state.get("rooms", {}).items():
                 room = Room(
@@ -427,6 +460,7 @@ class SemanticPalace:
                     visit_count=rdata.get("visit_count", 0),
                     last_visited=datetime.fromisoformat(rdata.get("last_visited", datetime.now().isoformat())),
                     memory_ids=rdata.get("memory_ids", []),
+                    visibility=Visibility(rdata.get("visibility", "shared")),
                 )
                 self.rooms[rid] = room
 
@@ -472,6 +506,8 @@ class SemanticPalace:
                     consecutive_successful_reviews=mdata.get("consecutive_successful_reviews", 0),
                     # Conflict tracking
                     superseded_by=mdata.get("superseded_by"),
+                    # Visibility
+                    visibility=Visibility(mdata.get("visibility", "shared")),
                 )
                 self.memories[mid] = memory
 

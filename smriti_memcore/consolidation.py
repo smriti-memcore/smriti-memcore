@@ -18,7 +18,7 @@ import numpy as np
 
 from smriti_memcore.models import (
     ConsolidationDepth, Memory, MemorySource, MemoryStatus,
-    MemoryTombstone, SmritiConfig, Skill, SalienceScore,
+    MemoryTombstone, SmritiConfig, Skill, SalienceScore, Visibility,
 )
 from smriti_memcore.episode_buffer import EpisodeBuffer
 from smriti_memcore.palace import SemanticPalace, Room
@@ -460,7 +460,7 @@ class ConsolidationEngine:
 
         active_memories = [
             m for m in self.palace.memories.values()
-            if m.status == MemoryStatus.ACTIVE
+            if m.status == MemoryStatus.ACTIVE and m.visibility != Visibility.PRIVATE
         ]
 
         # Compare recent memories against older ones
