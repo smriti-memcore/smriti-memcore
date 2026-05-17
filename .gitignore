@@ -54,6 +54,9 @@ paper2.txt
 _agent/
 .worktrees/
 
+# Benchmark datasets (large, not committed)
+data/
+
 # Test Databases
 langchain_smriti_db/
 
