@@ -52,7 +52,7 @@ RetrievalEngine.retrieve()
   │
   ├── fts_index.search(joined_variants)     (unchanged interface)
   ├── RRF merge                             (unchanged)
-  ├── multi-factor scoring                  (unchanged)
+  ├── multi-factor scoring                  (relevance input = palace-search lifted score)
   ├── reinforce + spaced-rep + WM admit     (unchanged)
   │
   └──[NEW] SnippetExtractor.extract(memory, query_variants, query_embedding, mode)
@@ -282,8 +282,24 @@ for mem in candidate_memories:
     lift = (num / den) if den > 0 else 0.0
     lift = min(lift, lift_max)
 
-    mem.retrieval_score = base * (1.0 + alpha * lift)
+    mem.relevance_score = base * (1.0 + alpha * lift)   # new transient field
 ```
+
+**Field choice — why `relevance_score`, not `retrieval_score`:** the downstream multi-factor scorer (`RetrievalEngine._score_memory`) writes `memory.retrieval_score` from a weighted composite of `(relevance, recency, strength, salience)`. If palace.search wrote to `retrieval_score`, that value would be overwritten and the adjacency lift would be lost. Instead, palace.search writes the lifted score to `memory.relevance_score`, and `_score_memory` consumes it as the relevance input:
+
+```python
+# In _score_memory (updated):
+if memory.relevance_score is not None and memory.relevance_score > 0:
+    relevance = memory.relevance_score    # from palace.search adjacency lift
+elif memory.embedding:
+    relevance = float(np.dot(query_embedding, np.array(memory.embedding)))  # FTS-only fallback
+else:
+    relevance = 0.0
+```
+
+This preserves the lift through the final ranking. FTS-only candidates (which never enter palace.search) fall back to raw cosine — acceptable since they entered the candidate pool via lexical match, not graph proximity.
+
+`Memory.relevance_score` is a new transient field (like `retrieval_score`, `hops`, `snippet`) — populated per-recall, not persisted.
 
 ### 6.2 Entry-room widening and candidate pool
 
