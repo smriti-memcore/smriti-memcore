@@ -187,3 +187,67 @@ class TestCosineFallback:
         assert m.snippet is not None
         # No " … " separator means a single sentence was picked
         assert "…" not in m.snippet
+
+
+class TestLLMMode:
+    @pytest.fixture
+    def fake_llm(self):
+        class FakeLLM:
+            def __init__(self):
+                self.calls = 0
+                self.fail = False
+                self.return_text = "LLM-extracted relevant sentence."
+
+            def generate(self, prompt, **kwargs):
+                self.calls += 1
+                if self.fail:
+                    raise RuntimeError("LLM down")
+                # Mimic LLMInterface.generate which returns a string-like object
+                class R:
+                    pass
+                r = R()
+                r.text = self.return_text
+                return r
+
+        return FakeLLM()
+
+    def test_llm_sets_snippet(self, vector_store, make_memory, fake_llm):
+        from smriti_memcore.snippet import SnippetExtractor
+        m = make_memory("a" * 400)  # exceed threshold
+        extractor = SnippetExtractor(vector_store=vector_store, llm=fake_llm)
+        result = extractor.extract(m, ["raw query"], np.zeros(384), mode="llm")
+        assert m.snippet == "LLM-extracted relevant sentence."
+        assert result.used_mode == "llm"
+        assert result.fallback is False
+        assert fake_llm.calls == 1
+
+    def test_llm_failure_falls_back_to_auto(self, vector_store, make_memory, fake_llm):
+        from smriti_memcore.snippet import SnippetExtractor
+        fake_llm.fail = True
+        content = ("FAISS underlies the vector search. " * 20)  # long, lexically rich
+        m = make_memory(content)
+        extractor = SnippetExtractor(vector_store=vector_store, llm=fake_llm)
+        result = extractor.extract(m, ["FAISS"], np.zeros(384), mode="llm")
+        assert result.fallback is True
+        assert result.used_mode == "auto"
+        assert m.snippet is not None  # auto path produced something
+
+    def test_llm_empty_response_falls_back(self, vector_store, make_memory, fake_llm):
+        from smriti_memcore.snippet import SnippetExtractor
+        fake_llm.return_text = "   "
+        content = ("FAISS underlies the vector search. " * 20)
+        m = make_memory(content)
+        extractor = SnippetExtractor(vector_store=vector_store, llm=fake_llm)
+        result = extractor.extract(m, ["FAISS"], np.zeros(384), mode="llm")
+        assert result.fallback is True
+        assert result.used_mode == "auto"
+
+    def test_llm_no_llm_configured_falls_back(self, vector_store, make_memory):
+        from smriti_memcore.snippet import SnippetExtractor
+        content = ("FAISS underlies the vector search. " * 20)
+        m = make_memory(content)
+        extractor = SnippetExtractor(vector_store=vector_store, llm=None)
+        result = extractor.extract(m, ["FAISS"], np.zeros(384), mode="llm")
+        assert result.fallback is True
+        assert result.used_mode == "auto"
+        assert m.snippet is not None

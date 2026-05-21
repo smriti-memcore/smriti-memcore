@@ -64,8 +64,7 @@ class SnippetExtractor:
         if mode == "auto":
             return self._extract_auto(memory, query_variants, raw_query_embedding)
         if mode == "llm":
-            # Implemented in Task 7
-            raise NotImplementedError("llm mode added in Task 7")
+            return self._extract_llm(memory, query_variants, raw_query_embedding)
         raise ValueError(f"Unknown mode {mode!r}")
 
     _SENTENCE_SPLIT = re.compile(r'(?<=[.!?])\s+')
@@ -129,3 +128,34 @@ class SnippetExtractor:
             parts.append(sentences[idx])
         memory.snippet = " ".join(parts)
         return ExtractResult(used_mode="auto")
+
+    def _extract_llm(self, memory, query_variants, raw_query_embedding) -> ExtractResult:
+        if self.llm is None:
+            logger.warning("SnippetExtractor mode='llm' requested but no LLM configured; falling back to auto")
+            # _extract_auto mutates memory.snippet directly — we discard its return value
+            # because the outer ExtractResult below carries the fallback flag.
+            self._extract_auto(memory, query_variants, raw_query_embedding)
+            return ExtractResult(used_mode="auto", fallback=True)
+
+        raw_query = query_variants[0] if query_variants else ""
+        prompt = (
+            "Given this query and memory content, extract the 1-2 sentences most relevant\n"
+            "to the query. Return only the extracted text, nothing else.\n\n"
+            f"Query: {raw_query}\n"
+            f"Content: {memory.content}"
+        )
+        try:
+            response = self.llm.generate(prompt)
+            text = getattr(response, "text", str(response)).strip()
+        except Exception as e:
+            logger.warning(f"SnippetExtractor LLM call failed: {e}; falling back to auto")
+            self._extract_auto(memory, query_variants, raw_query_embedding)
+            return ExtractResult(used_mode="auto", fallback=True)
+
+        if not text:
+            logger.warning("SnippetExtractor LLM returned empty; falling back to auto")
+            self._extract_auto(memory, query_variants, raw_query_embedding)
+            return ExtractResult(used_mode="auto", fallback=True)
+
+        memory.snippet = text
+        return ExtractResult(used_mode="llm")
