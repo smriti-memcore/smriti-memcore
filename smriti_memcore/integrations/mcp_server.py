@@ -222,6 +222,27 @@ def smriti_recall(
 
 
 @mcp_server.tool()
+def smriti_get_memory(memory_id: str) -> Dict[str, Any]:
+    """
+    Fetch the full content of a memory by id.
+
+    Use this when smriti_recall returned a snippet (expandable=true) and you need the
+    complete memory. Returns the same shape as smriti_recall's per-memory dict, with
+    `content` always set to the full memory text and `expandable=false`.
+    """
+    try:
+        mem = _smriti.palace.get_memory(memory_id)
+        if mem is None:
+            return {"error": f"memory {memory_id} not found"}
+        # Clear any stale snippet so serialize_memory returns full content
+        mem.snippet = None
+        return serialize_memory(mem, smriti=_smriti)
+    except Exception as e:
+        logger.error(f"smriti_get_memory failed: {e}")
+        return {"error": str(e)}
+
+
+@mcp_server.tool()
 def smriti_get_context() -> Dict[str, str]:
     """
     Get formatted working memory context for injection into a prompt.

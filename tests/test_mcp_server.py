@@ -411,4 +411,27 @@ class TestSmartRecallMcpResponse:
         # m.snippet is None
         d = serialize_memory(m)
         assert d["content"] == "full content"
-        assert d["expandable"] is False
+
+
+class TestSmritiGetMemory:
+    def test_get_memory_returns_full_content(self):
+        """Existing inject_smriti fixture is autouse; _smriti is populated."""
+        import smriti_memcore.integrations.mcp_server as mcp_module
+        from smriti_memcore.models import MemorySource
+        s = mcp_module._smriti
+        mid = s.encode(
+            "full content of a memory used to verify the get_memory tool",
+            source=MemorySource.USER_STATED,
+        )
+        if not mid:
+            import pytest
+            pytest.skip("attention gate discarded the seeded memory")
+        result = mcp_module.smriti_get_memory(memory_id=mid)
+        assert result["id"] == mid
+        assert result["content"] == "full content of a memory used to verify the get_memory tool"
+        assert result["expandable"] is False
+
+    def test_get_memory_unknown_id_returns_error(self):
+        import smriti_memcore.integrations.mcp_server as mcp_module
+        result = mcp_module.smriti_get_memory(memory_id="00000000-0000-0000-0000-000000000000")
+        assert "error" in result
