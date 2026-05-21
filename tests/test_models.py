@@ -158,3 +158,33 @@ class TestConfidenceLevel:
         c = ConfidenceLevel(coverage=0.8, freshness=0.9, strength=0.7, depth=2)
         assert c.is_unknown is False
         assert c.overall > 0
+
+
+class TestSnippetField:
+    def test_memory_has_snippet_field(self):
+        from smriti_memcore.models import Memory
+        m = Memory(content="hello world")
+        assert hasattr(m, "snippet")
+        assert m.snippet is None
+
+    def test_snippet_not_in_to_dict(self):
+        """snippet is transient — never serialised to palace.json."""
+        from smriti_memcore.models import Memory
+        m = Memory(content="hello")
+        m.snippet = "trimmed"
+        d = m.to_dict()
+        assert "snippet" not in d
+
+    def test_memory_has_relevance_score_field(self):
+        """relevance_score is the lift-adjusted score from palace.search (spec §6.1)."""
+        from smriti_memcore.models import Memory
+        m = Memory(content="x")
+        assert hasattr(m, "relevance_score")
+        assert m.relevance_score == 0.0
+
+    def test_relevance_score_not_in_to_dict(self):
+        from smriti_memcore.models import Memory
+        m = Memory(content="x")
+        m.relevance_score = 0.7
+        d = m.to_dict()
+        assert "relevance_score" not in d

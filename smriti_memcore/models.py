@@ -143,6 +143,11 @@ class Memory:
     retrieval_score: float = 0.0
     hops: int = 0
 
+    # Adjacency-lifted relevance score from palace.search (transient; spec §6.1)
+    relevance_score: float = 0.0
+    # Snippet — transient, populated by SnippetExtractor on long memories
+    snippet: Optional[str] = None
+
     # Reflection level (0=raw, 1=observation, 2=insight, 3=principle)
     reflection_level: int = 0
 
