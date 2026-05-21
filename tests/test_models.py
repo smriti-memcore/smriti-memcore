@@ -58,7 +58,8 @@ class TestMemory:
         )
         d = m.to_dict()
         assert d["content"] == "roundtrip test"
-        assert d["embedding"] == [0.1, 0.2, 0.3]
+        # embedding is no longer serialized to palace.json (schema v3+) — stored in VectorStore
+        assert "embedding" not in d
         assert d["associations"] == ["mem_a", "mem_b"]
         assert d["metadata"] == {"key": "value"}
         assert d["source"] == "user_stated"
@@ -85,13 +86,15 @@ class TestMemory:
         m = Memory(content="test")
         d = m.to_dict()
         required_fields = [
-            "id", "content", "embedding", "modality", "source", "status",
+            "id", "content", "modality", "source", "status",
             "room_id", "associations", "strength", "confidence", "salience",
             "creation_time", "last_accessed", "access_count", "reflection_level",
             "metadata",
         ]
         for field in required_fields:
             assert field in d, f"Missing field: {field}"
+        # embedding is intentionally excluded since schema v3 (stored in VectorStore)
+        assert "embedding" not in d
 
 
 class TestSmritiConfig:
