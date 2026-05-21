@@ -267,47 +267,52 @@ class SemanticPalace:
     # ── Multi-Hop Search ─────────────────────────────────
 
     def search(
-        self, query: str, top_k: int = 10, max_hops: int = 1
+        self,
+        variants: List[str],
+        variant_embeddings: List[np.ndarray],
+        top_k: int = 10,
+        max_hops: int = 1,
     ) -> List[Memory]:
         """
         Multi-hop associative search through the palace.
-        
-        1. Find relevant rooms (entry points)
-        2. Search within those rooms
-        3. Follow hallways to connected rooms (contextual priming)
-        4. Search neighbors too
-        """
-        entry_rooms = self.find_rooms(query, top_k=3)
-        candidates: Dict[str, Tuple[Memory, float, int]] = {}  # id -> (memory, score, hops)
 
-        query_embedding = self.vector_store.embed(query)
+        Spec §6 — accepts precomputed variant embeddings from the caller
+        (RetrievalEngine.retrieve()) to avoid double-embedding the query when
+        FTS5 is also active.
+        """
+        assert len(variants) == len(variant_embeddings), \
+            f"variants and variant_embeddings must align; got {len(variants)} and {len(variant_embeddings)}"
+
+        # Use the first variant (raw query) for room-finding for now;
+        # Task 9 will rework this to score rooms by max-over-variants.
+        primary = variants[0] if variants else ""
+        primary_emb = variant_embeddings[0] if variant_embeddings else None
+
+        entry_rooms = self.find_rooms(primary, top_k=3)
+        candidates: Dict[str, Tuple[Memory, float, int]] = {}
 
         for room in entry_rooms:
             room.visit_count += 1
             room.last_visited = datetime.now()
 
-            # Search within entry room (hop=0)
             for mem in self.get_room_memories(room.id):
-                if mem.embedding:
-                    score = float(np.dot(query_embedding, np.array(mem.embedding)))
+                if mem.embedding and primary_emb is not None:
+                    score = float(np.dot(primary_emb, np.array(mem.embedding)))
                     if mem.id not in candidates or score > candidates[mem.id][1]:
                         candidates[mem.id] = (mem, score, 0)
 
-            # Follow hallways for multi-hop (hop=1)
             if max_hops >= 1:
                 for neighbor, edge in self.get_neighbors(room.id):
                     neighbor.visit_count += 1
                     neighbor.last_visited = datetime.now()
 
                     for mem in self.get_room_memories(neighbor.id):
-                        if mem.embedding:
-                            score = float(np.dot(query_embedding, np.array(mem.embedding)))
-                            # Discount neighbor scores slightly
+                        if mem.embedding and primary_emb is not None:
+                            score = float(np.dot(primary_emb, np.array(mem.embedding)))
                             score *= 0.85 * edge.strength
                             if mem.id not in candidates or score > candidates[mem.id][1]:
                                 candidates[mem.id] = (mem, score, 1)
 
-        # Sort by score and take top_k
         sorted_candidates = sorted(
             candidates.values(),
             key=lambda x: x[1],

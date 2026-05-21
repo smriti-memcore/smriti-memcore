@@ -143,11 +143,11 @@ class TestSharedMemoriesHelper:
 
 
 class TestPrivateMemoryRecall:
-    def test_private_memory_is_recalled_by_owner(self, palace):
+    def test_private_memory_is_recalled_by_owner(self, palace, vector_store):
         mem = Memory(content="my private note about project X", visibility=Visibility.PRIVATE)
         palace.place_memory(mem)
 
-        results = palace.search("project X", top_k=5)
+        results = palace.search(["project X"], [vector_store.embed("project X")], top_k=5)
         ids = {m.id for m in results}
         assert mem.id in ids
 

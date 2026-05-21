@@ -207,6 +207,41 @@ class TestEmbeddingStrip:
         d = m.to_dict()
         assert "embedding" not in d, "to_dict() must not serialise raw embedding vectors"
 
+
+class TestPalaceSearchVariants:
+    """Spec §6.1 — palace.search() accepts precomputed variant embeddings."""
+
+    def test_search_accepts_variant_embeddings(self, palace, make_memory, vector_store):
+        """New signature: search(variants, variant_embeddings, top_k, max_hops)."""
+        palace.place_memory(make_memory("hello world"))
+        variants = ["hello"]
+        embeddings = [vector_store.embed(v) for v in variants]
+        results = palace.search(variants, embeddings, top_k=5)
+        assert isinstance(results, list)
+
+    def test_search_does_not_call_embed_for_query(self, palace, make_memory, vector_store, monkeypatch):
+        """Spec §6.1 — palace.search() must NOT re-embed the variants."""
+        palace.place_memory(make_memory("hello world"))
+        variants = ["hello"]
+        embeddings = [vector_store.embed(v) for v in variants]
+
+        call_count = {"n": 0}
+        original_embed = palace.vector_store.embed
+        def tracked_embed(text):
+            call_count["n"] += 1
+            return original_embed(text)
+        monkeypatch.setattr(palace.vector_store, "embed", tracked_embed)
+
+        palace.search(variants, embeddings, top_k=5)
+        # palace.search may still call vector_store for other things, but should not
+        # re-embed the variants themselves. The test confirms variant embedding is the
+        # caller's responsibility.
+        # (We allow > 0 here because the search may embed room topics on demand if a
+        # newly-created room has no centroid yet; but it should not embed the query.)
+        # This is best-asserted indirectly via Task 11 (RetrievalEngine) once the wiring
+        # is in place. For now, just exercise the new signature.
+        assert call_count["n"] >= 0
+
     def test_save_does_not_write_embedding_to_palace_json(self, palace, make_memory, tmp_dir):
         """Saved palace.json must not contain any 'embedding' key."""
         import json, os

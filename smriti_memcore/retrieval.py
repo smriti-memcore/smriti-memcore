@@ -70,7 +70,9 @@ class RetrievalEngine:
         start_time = time.time()
 
         # Step 1a — vector search (wider pool: top_k*3)
-        vector_candidates = self.palace.search(query, top_k=top_k * 3, max_hops=max_hops)
+        # TEMPORARY shim: Task 10 replaces this with QueryRewriter integration.
+        _temp_emb = self.vector_store.embed(query)
+        vector_candidates = self.palace.search([query], [_temp_emb], top_k=top_k * 3, max_hops=max_hops)
 
         if self.fts_index is not None:
             # Step 1b — FTS keyword search
