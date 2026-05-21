@@ -42,8 +42,10 @@ RetrievalEngine.retrieve()
   ├──[NEW] QueryRewriter.expand(query, mode)
   │         → List[str] of query variants (always includes the raw query)
   │
-  ├──[MODIFIED] palace.search(variants, top_k_rooms=5)
-  │         ─ Embed each variant once; cache the embeddings
+  ├──[MODIFIED] palace.search(variants, variant_embeddings, top_k_rooms=5)
+  │         ─ RetrievalEngine embeds each variant ONCE (via self.vector_store.embed)
+  │           and passes both the strings and their embeddings down.
+  │           palace.search() does NOT re-embed.
   │         ─ Entry rooms widened from top-3 → top-5 by max-over-variants
   │           similarity to room centroid
   │         ─ Per-memory adjacency lift replaces the 0.85 discount
@@ -91,7 +93,7 @@ class QueryRewriter:
     ): ...
 
     def expand(self, query: str, mode: str = "auto") -> ExpandResult:
-        """Return query variants plus metadata."""
+        """Return query variants plus metadata. `variants[0]` is always the raw query."""
 
 @dataclass
 class ExpandResult:
@@ -99,6 +101,8 @@ class ExpandResult:
     used_mode: str                    # what actually ran ("auto" / "llm" / "none")
     fallback: bool = False            # True iff requested mode failed and we fell back
 ```
+
+**Invariant:** `variants[0] == query` for all modes. Downstream consumers (snippet extractor LLM prompt, cosine-floor fallback) rely on this for "the raw query."
 
 ### 4.2 `mode="auto"` — lexical variants
 
@@ -122,9 +126,9 @@ Query: {query}
 Variants:
 ```
 
-Returned variants are concatenated to the raw query (so we always have ≥ 4 variants).
+Returned variants are concatenated to the raw query and deduped, so the final list contains the raw query plus up to 3 distinct paraphrases. If the LLM returns fewer than 3 distinct items (or some are empty / equal to the raw query after stripping), the final variant count may be 1-4; that's acceptable. Empty strings and whitespace-only entries are dropped.
 
-**Failure handling:** if the LLM call raises or returns malformed JSON, log a warning, set `fallback=True`, and fall back to `mode="auto"`.
+**Failure handling:** if the LLM call raises, times out, returns non-JSON, returns a non-list, or returns a list with zero usable strings after dedupe, log a warning, set `fallback=True`, and fall back to `mode="auto"`. No partial-LLM result is kept.
 
 ### 4.4 LLM cache
 
@@ -146,6 +150,7 @@ Returns `ExpandResult(variants=[query], used_mode="none", fallback=False)`.
 class SnippetExtractor:
     def __init__(
         self,
+        vector_store: VectorStore,             # required — used by §5.5 cosine fallback
         min_chars: int = 300,
         max_sentences: int = 2,
         llm: Optional[LLMInterface] = None,
@@ -154,12 +159,21 @@ class SnippetExtractor:
     def extract(
         self,
         memory: Memory,
-        query_variants: List[str],
-        query_embedding: np.ndarray,
+        query_variants: List[str],             # variants[0] is the raw query (invariant from §4.1)
+        raw_query_embedding: np.ndarray,       # embedding of variants[0] specifically
         mode: str = "auto",
-    ) -> None:
+    ) -> ExtractResult:
         """Mutates memory.snippet in place. Never touches memory.content."""
+
+@dataclass
+class ExtractResult:
+    used_mode: str                    # "auto" / "llm" / "none"
+    fallback: bool = False            # True iff requested mode failed and we fell back
 ```
+
+**Why a return value:** §5.6's `mode="llm"` may fail and fall back to lexical. `RetrievalEngine` needs to know so it can surface `metadata.snippet_fallback` to the MCP layer. Mutating-only would lose that signal.
+
+**Embedding identity:** the `raw_query_embedding` parameter is specifically `vector_store.embed(variants[0])` — i.e., the raw query's embedding, not a max-over-variants aggregate. The cosine-floor fallback (§5.5) compares each sentence to this single embedding. We use the raw query (not an aggregate) because the fallback is for the case where the user's literal phrasing matters and lexical signals were absent.
 
 ### 5.2 Required pre-extraction step (state-leak guard)
 
@@ -184,34 +198,48 @@ Clears `memory.snippet` (§5.2) and returns. Used by library callers who want ra
 
 ### 5.5 Zero-overlap fallback — cosine floor
 
-If every sentence scores 0 (lexical overlap is empty, e.g., the recall hit was purely on vector similarity), pick the sentence with the highest cosine similarity to `query_embedding`:
+If every sentence scores 0 (lexical overlap is empty, e.g., the recall hit was purely on vector similarity), pick the sentence with the highest cosine similarity to the raw-query embedding:
 
 ```python
-sentence_embeddings = [vector_store.embed(s) for s in sentences]
-scores = [float(np.dot(query_embedding, se)) for se in sentence_embeddings]
+sentence_embeddings = [self.vector_store.embed(s) for s in sentences]
+scores = [float(np.dot(raw_query_embedding, se)) for se in sentence_embeddings]
 top_idx = int(np.argmax(scores))
 memory.snippet = sentences[top_idx]
 ```
 
-Cheap (rare path; one embedding per sentence; small N). Decisively better than "first sentence" — Codex was right that first-sentence biases toward intros.
+Uses `self.vector_store` from `__init__` (§5.1) and `raw_query_embedding` from the `extract()` call. Cheap (rare path; one embedding per sentence; small N). Decisively better than "first sentence" — Codex was right that first-sentence biases toward intros.
 
 ### 5.6 `mode="llm"` — LLM-extracted sentences
 
-Single call per memory:
+Single call per memory. The prompt uses the raw query (`variants[0]`):
 
 ```
 Given this query and memory content, extract the 1-2 sentences most relevant
 to the query. Return only the extracted text, nothing else.
 
-Query: {query}
-Content: {content}
+Query: {variants[0]}
+Content: {memory.content}
 ```
 
-If the LLM raises or returns empty, fall back to `mode="auto"`. Same metadata-flag pattern as §4.3 — set a per-memory flag captured by `RetrievalEngine` and surfaced in the MCP layer's `metadata.snippet_fallback`.
+If the LLM raises, times out, or returns an empty / whitespace-only string, fall back to `mode="auto"` (which itself may further fall back to the cosine floor in §5.5). The fallback sets `ExtractResult.fallback=True`; `RetrievalEngine` captures it and surfaces it to the MCP layer as `metadata.snippet_fallback`.
 
 ## 6. Per-Memory Adjacency Lift
 
 ### 6.1 What changes in `palace.search()`
+
+**New signature:**
+```python
+def search(
+    self,
+    variants: List[str],                    # query strings (variants[0] = raw)
+    variant_embeddings: List[np.ndarray],   # embeddings for variants, same length & order
+    top_k: int = 10,
+    max_hops: int = 1,
+) -> List[Memory]: ...
+```
+
+`palace.search()` does not call `self.vector_store.embed()` for the query anymore — the caller (`RetrievalEngine.retrieve()`) owns variant embedding and passes the precomputed embeddings down. This keeps each variant embedded exactly once even when the FTS5 path is also enabled.
+
 
 Replace the legacy block:
 
@@ -305,14 +333,14 @@ SMRITI.recall(
     query: str,
     context: str = "",
     top_k: Optional[int] = None,
-    rewrite: str = "auto",          # NEW
-    snippet: str = "auto",          # NEW
+    rewrite: Optional[str] = None,  # NEW; None → use config.rewrite_mode_default
+    snippet: Optional[str] = None,  # NEW; None → use config.snippet_mode_default
 ) -> List[Memory]
 ```
 
-Same two parameters propagate through `RetrievalEngine.retrieve()`. Memory objects gain a transient `snippet: Optional[str]` field.
+`None` is the "use config default" sentinel. The first non-None value (caller param → config field) wins. Same two parameters propagate through `RetrievalEngine.retrieve()`. Memory objects gain a transient `snippet: Optional[str]` field.
 
-**Backward compatibility:** callers who don't pass `rewrite` / `snippet` get the new defaults (`"auto"`). For strict regression-guard tests, pass `rewrite="none", snippet="none"` to disable both new features.
+**Backward compatibility:** callers who don't pass `rewrite` / `snippet` get whatever the config says (default `"auto"` per §7). For strict regression-guard tests, pass `rewrite="none", snippet="none"` explicitly to disable both new features regardless of config.
 
 ### 8.2 MCP `smriti_recall` tool
 
@@ -351,9 +379,33 @@ JSON response per memory gains:
 
 Always-present fields keep the agent's schema understanding stable.
 
+### 8.3 New MCP tool: `smriti_get_memory`
+
+For `expandable: true` to be actionable, the agent needs a way to fetch a memory's full content after seeing the snippet. Adds one small MCP tool wrapping the existing `palace.get_memory()`:
+
+```json
+{
+  "name": "smriti_get_memory",
+  "description": "Fetch the full content of a memory by id. Use this when smriti_recall returned a snippet (expandable=true) and you need the complete memory.",
+  "parameters": {
+    "memory_id": {"type": "string"}
+  }
+}
+```
+
+Response payload mirrors the recall-result shape but with `content` = full memory content, `expandable` = false, and `snippet` field omitted.
+
+### 8.4 Backward compatibility note for MCP consumers
+
+The `content` field of `smriti_recall` responses now contains a snippet whenever extraction populated `memory.snippet` (i.e., long memories with `snippet_mode="auto"|"llm"`). Callers that strictly required `content` to be the full memory text under the v1.1 schema must either:
+- set `snippet="none"` on the tool call (returns content as before), or
+- call the new `smriti_get_memory` tool after recall to fetch full content.
+
+This is a soft breaking change in the field semantics, not the schema shape — `content` is still a string. Documented here for clarity.
+
 ## 9. Testing Strategy (TDD)
 
-All new behavior follows red-green-refactor. Each task in the implementation plan begins with a failing test that pins the contract.
+**Process discipline:** all new behavior follows red-green-refactor — write the failing test first, confirm it fails for the right reason, write the minimal code to pass, run the test, commit. This is a process expectation on the implementation plan, not a functional acceptance criterion (see §13).
 
 | Test file | Coverage |
 |---|---|
@@ -396,13 +448,17 @@ These were raised by Codex review and accepted as out-of-scope for this spec:
 | LLM cache key? | `(query, model_name, prompt_version)`. |
 | Snippet state leak? | `extract()` clears `memory.snippet` unconditionally on entry. |
 | First-sentence vs cosine-floor fallback? | Cosine floor — Codex was right. |
+| Config vs API defaults? | API params use `None` sentinel; config provides actual defaults. |
+| Who embeds query variants? | `RetrievalEngine` embeds once, passes embeddings to palace + snippet extractor. |
+| Snippet LLM prompt — which query? | `variants[0]` (the raw query); SnippetExtractor takes a `raw_query_embedding` parameter. |
+| How is `expandable: true` actionable? | New `smriti_get_memory(memory_id)` MCP tool returns full content. |
 
 ## 13. Acceptance Criteria
 
 This work is done when:
 
-1. All new and modified tests pass under TDD discipline (red → green → commit per task).
+1. All new and modified tests in §9 pass.
 2. The existing 233-test suite continues to pass.
-3. `scripts/bench_recall.py` shows ≥ 30% reduction in avg tokens/query AND no regression (≤ -2 percentage points) in hit-rate@10.
-4. `recall(rewrite="none", snippet="none")` is byte-for-byte equivalent in result ordering to pre-change behavior (regression guard).
-5. The MCP tool schema correctly exposes both new enums; an agent can choose between modes.
+3. `scripts/bench_recall.py` shows ≥ 30% reduction in avg tokens/query AND no regression (≤ -2 percentage points) in hit-rate@10 against the pre-change baseline.
+4. **Regression guard:** for a fixed test corpus and a fixed set of queries, `recall(rewrite="none", snippet="none")` returns the same list of memory IDs in the same order as the pre-change `main` branch. Retrieval scores and transient field values are not required to match exactly (the modified pipeline touches them); the ID-ordering invariant is what guards against unintended behavior shifts.
+5. The MCP tool schema correctly exposes the `rewrite` and `snippet` enums on `smriti_recall` and the new `smriti_get_memory` tool; an agent can choose between modes and fetch full content when needed.
