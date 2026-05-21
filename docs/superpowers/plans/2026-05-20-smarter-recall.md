@@ -614,29 +614,12 @@ git commit -m "feat: add QueryRewriter mode=llm with LRU cache and fallback sema
 Create `tests/test_snippet.py`:
 
 ```python
-"""Tests for SnippetExtractor — sentence-level snippet generation."""
+"""Tests for SnippetExtractor — sentence-level snippet generation.
+
+Uses `vector_store` and `make_memory` fixtures from tests/conftest.py.
+"""
 import numpy as np
 import pytest
-
-
-@pytest.fixture
-def vector_store():
-    from smriti_memcore.vector_store import VectorStore
-    import tempfile, os
-    with tempfile.TemporaryDirectory() as d:
-        yield VectorStore(
-            model_name="all-MiniLM-L6-v2",
-            dimension=384,
-            storage_path=os.path.join(d, "vectors"),
-        )
-
-
-@pytest.fixture
-def make_memory():
-    from smriti_memcore.models import Memory
-    def _make(content):
-        return Memory(content=content)
-    return _make
 
 
 class TestExtractResult:
@@ -716,7 +699,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -1184,7 +1167,9 @@ Then add the helper at the end of the class:
     def _extract_llm(self, memory, query_variants, raw_query_embedding) -> ExtractResult:
         if self.llm is None:
             logger.warning("SnippetExtractor mode='llm' requested but no LLM configured; falling back to auto")
-            auto = self._extract_auto(memory, query_variants, raw_query_embedding)
+            # _extract_auto mutates memory.snippet directly — we discard its return value
+            # because the outer ExtractResult below carries the fallback flag.
+            self._extract_auto(memory, query_variants, raw_query_embedding)
             return ExtractResult(used_mode="auto", fallback=True)
 
         raw_query = query_variants[0] if query_variants else ""
@@ -2278,11 +2263,15 @@ Expected: FAIL (signature lacks rewrite/snippet; serialize_memory doesn't have e
 
 - [ ] **Step 3: Update `smriti_recall` tool function**
 
-In `smriti_memcore/integrations/mcp_server.py` (around line 157), replace the existing `smriti_recall`:
+First, add `Literal` to the typing imports at the top of `smriti_memcore/integrations/mcp_server.py` (around line 20 — `Optional` is already imported):
 
 ```python
-from typing import Literal  # add at top of file if not already imported
+from typing import Any, Dict, List, Literal, Optional
+```
 
+Then in the same file (around line 157), replace the existing `smriti_recall`:
+
+```python
 @mcp_server.tool()
 def smriti_recall(
     query: str,
@@ -2525,7 +2514,22 @@ class TestRegressionGuard:
     """
 
     @pytest.fixture
-    def seeded_smriti(self, smriti):
+    def _smriti(self, tmp_dir, mock_llm):
+        """Local SMRITI fixture — the `smriti` fixture in tests/test_core.py is not in
+        conftest.py, so it's not visible from test_retrieval.py."""
+        import os
+        from smriti_memcore.models import SmritiConfig
+        from smriti_memcore import SMRITI
+        config = SmritiConfig(storage_path=os.path.join(tmp_dir, "smriti_db"))
+        n = SMRITI(config=config)
+        n.llm = mock_llm
+        n.attention_gate.llm = mock_llm
+        n.consolidation_engine.llm = mock_llm
+        yield n
+        n.close()
+
+    @pytest.fixture
+    def seeded_smriti(self, _smriti):
         from smriti_memcore.models import MemorySource
         corpus = [
             "Python is a high-level programming language used for many tasks",
@@ -2540,8 +2544,8 @@ class TestRegressionGuard:
             "MIT license is permissive and widely used in open-source projects",
         ]
         for c in corpus:
-            smriti.encode(c, source=MemorySource.USER_STATED, use_llm=True)
-        return smriti
+            _smriti.encode(c, source=MemorySource.USER_STATED, use_llm=True)
+        return _smriti
 
     def test_disabled_features_return_full_content(self, seeded_smriti):
         """snippet='none' must leave memory.snippet as None."""
