@@ -332,6 +332,17 @@ class SmritiConfig:
     embedding_model: str = "all-MiniLM-L6-v2"
     embedding_dim: int = 384
 
+    # Smarter recall (2026-05-20 design)
+    rewrite_mode_default: str = "auto"           # "auto" | "llm" | "none"
+    snippet_mode_default: str = "auto"
+    snippet_min_chars: int = 300                 # ≤ this → return content as-is
+    snippet_max_sentences: int = 2
+    llm_rewrite_cache_size: int = 100
+    llm_rewrite_prompt_version: str = "v1"       # cache-key component
+    adjacency_alpha: float = 0.3                 # lift coefficient
+    adjacency_lift_max: float = 1.0              # cap on weighted-average lift
+    entry_rooms_top_k: int = 5                   # widened from hardcoded 3
+
     # Storage
     storage_path: str = "./smriti_data"
 
@@ -366,4 +377,31 @@ class SmritiConfig:
         if abs(weight_sum - 1.0) > 0.01:
             import warnings
             warnings.warn(f"Scoring weights sum to {weight_sum:.2f} instead of 1.0")
+
+        # Smarter recall validation
+        _valid_modes = {"auto", "llm", "none"}
+        if self.rewrite_mode_default not in _valid_modes:
+            raise ValueError(
+                f"rewrite_mode_default must be one of {_valid_modes}, got {self.rewrite_mode_default!r}"
+            )
+        if self.snippet_mode_default not in _valid_modes:
+            raise ValueError(
+                f"snippet_mode_default must be one of {_valid_modes}, got {self.snippet_mode_default!r}"
+            )
+        if not (0.0 <= self.adjacency_alpha <= 1.0):
+            raise ValueError(
+                f"adjacency_alpha must be in [0, 1], got {self.adjacency_alpha}"
+            )
+        if self.entry_rooms_top_k < 1:
+            raise ValueError(
+                f"entry_rooms_top_k must be >= 1, got {self.entry_rooms_top_k}"
+            )
+        if self.snippet_min_chars < 0:
+            raise ValueError(
+                f"snippet_min_chars must be >= 0, got {self.snippet_min_chars}"
+            )
+        if self.snippet_max_sentences < 1:
+            raise ValueError(
+                f"snippet_max_sentences must be >= 1, got {self.snippet_max_sentences}"
+            )
 

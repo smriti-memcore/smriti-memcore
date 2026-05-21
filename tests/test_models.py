@@ -188,3 +188,44 @@ class TestSnippetField:
         m.relevance_score = 0.7
         d = m.to_dict()
         assert "relevance_score" not in d
+
+
+class TestSmritiConfigSmartRecallFields:
+    def test_defaults(self):
+        from smriti_memcore.models import SmritiConfig
+        c = SmritiConfig()
+        assert c.rewrite_mode_default == "auto"
+        assert c.snippet_mode_default == "auto"
+        assert c.snippet_min_chars == 300
+        assert c.snippet_max_sentences == 2
+        assert c.llm_rewrite_cache_size == 100
+        assert c.llm_rewrite_prompt_version == "v1"
+        assert c.adjacency_alpha == 0.3
+        assert c.adjacency_lift_max == 1.0
+        assert c.entry_rooms_top_k == 5
+
+    def test_validation_rewrite_mode(self):
+        import pytest
+        from smriti_memcore.models import SmritiConfig
+        with pytest.raises(ValueError, match="rewrite_mode_default"):
+            SmritiConfig(rewrite_mode_default="bogus")
+
+    def test_validation_snippet_mode(self):
+        import pytest
+        from smriti_memcore.models import SmritiConfig
+        with pytest.raises(ValueError, match="snippet_mode_default"):
+            SmritiConfig(snippet_mode_default="bogus")
+
+    def test_validation_alpha_range(self):
+        import pytest
+        from smriti_memcore.models import SmritiConfig
+        with pytest.raises(ValueError, match="adjacency_alpha"):
+            SmritiConfig(adjacency_alpha=-0.1)
+        with pytest.raises(ValueError, match="adjacency_alpha"):
+            SmritiConfig(adjacency_alpha=1.5)
+
+    def test_validation_entry_rooms_top_k(self):
+        import pytest
+        from smriti_memcore.models import SmritiConfig
+        with pytest.raises(ValueError, match="entry_rooms_top_k"):
+            SmritiConfig(entry_rooms_top_k=0)
