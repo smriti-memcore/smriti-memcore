@@ -57,9 +57,7 @@ class QueryRewriter:
         if mode == "auto":
             return ExpandResult(variants=self._lexical_variants(query), used_mode="auto")
         if mode == "llm":
-            # Task 3 replaces this with self._llm_expand(query). Until then, raising
-            # is correct: no LLM caller is wired up yet, so callers shouldn't see "llm".
-            raise NotImplementedError("llm mode added in Task 3")
+            return self._llm_expand(query)
         raise ValueError(f"Unknown mode {mode!r} (expected 'auto'|'llm'|'none')")
 
     # ── Lexical variant generation ─────────────────────────────
@@ -85,3 +83,68 @@ class QueryRewriter:
             variants.append(content_words)
 
         return variants
+
+    # ── LLM variant generation ─────────────────────────────────
+
+    def _llm_expand(self, query: str) -> ExpandResult:
+        """LLM rewrite path. Falls back to auto on any failure."""
+        if self.llm is None:
+            logger.warning("QueryRewriter mode='llm' requested but no LLM configured; falling back to auto")
+            return ExpandResult(variants=self._lexical_variants(query), used_mode="auto", fallback=True)
+
+        # LLMInterface stores its model under `default_model` (llm_interface.py:42).
+        # Fall through to model / model_name for other LLM implementations that may follow
+        # different conventions.
+        model_name = (
+            getattr(self.llm, "default_model", None)
+            or getattr(self.llm, "model", None)
+            or getattr(self.llm, "model_name", None)
+            or "unknown"
+        )
+        cache_key = (query, model_name, self.prompt_version)
+
+        if cache_key in self._llm_cache:
+            self._llm_cache.move_to_end(cache_key)
+            return ExpandResult(variants=self._llm_cache[cache_key], used_mode="llm")
+
+        try:
+            raw = self.llm.generate_json(self._build_prompt(query))
+        except Exception as e:
+            logger.warning(f"QueryRewriter LLM call failed: {e}; falling back to auto")
+            return ExpandResult(variants=self._lexical_variants(query), used_mode="auto", fallback=True)
+
+        if not isinstance(raw, list):
+            logger.warning(f"QueryRewriter LLM returned non-list ({type(raw).__name__}); falling back to auto")
+            return ExpandResult(variants=self._lexical_variants(query), used_mode="auto", fallback=True)
+
+        # Filter empty/whitespace and deduplicate (preserving order), drop entries equal to raw query
+        seen = {query}
+        cleaned: List[str] = [query]
+        for item in raw:
+            if not isinstance(item, str):
+                continue
+            s = item.strip()
+            if not s or s in seen:
+                continue
+            seen.add(s)
+            cleaned.append(s)
+
+        if len(cleaned) == 1:
+            # LLM returned nothing usable
+            logger.warning("QueryRewriter LLM produced no usable variants; falling back to auto")
+            return ExpandResult(variants=self._lexical_variants(query), used_mode="auto", fallback=True)
+
+        # Evict LRU if at capacity
+        if len(self._llm_cache) >= self._cache_size:
+            self._llm_cache.popitem(last=False)
+        self._llm_cache[cache_key] = cleaned
+
+        return ExpandResult(variants=cleaned, used_mode="llm")
+
+    def _build_prompt(self, query: str) -> str:
+        return (
+            "Given this user query, generate exactly 3 paraphrased variants that preserve\n"
+            "meaning but use different wording. Return as a JSON list of strings.\n\n"
+            f"Query: {query}\n"
+            "Variants:"
+        )
