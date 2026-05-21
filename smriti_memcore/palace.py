@@ -296,7 +296,7 @@ class SemanticPalace:
             room_scores[rid] = max(0.0, best)
 
         # Spec §6.2 — top-N entry rooms (default 5, configurable via self.config).
-        top_k_rooms = getattr(self.config, "entry_rooms_top_k", 5) if hasattr(self, "config") else 5
+        top_k_rooms = getattr(self.config, "entry_rooms_top_k", 5)
         entry_rids = sorted(room_scores, key=lambda r: room_scores[r], reverse=True)[:top_k_rooms]
 
         # Collect candidate pool: entry rooms ∪ 1-hop neighbors
@@ -314,8 +314,8 @@ class SemanticPalace:
                 room.visit_count += 1
                 room.last_visited = now
 
-        alpha = getattr(self.config, "adjacency_alpha", 0.3) if hasattr(self, "config") else 0.3
-        lift_max = getattr(self.config, "adjacency_lift_max", 1.0) if hasattr(self, "config") else 1.0
+        alpha = getattr(self.config, "adjacency_alpha", 0.3)
+        lift_max = getattr(self.config, "adjacency_lift_max", 1.0)
 
         candidates: Dict[str, Tuple[Memory, float, int]] = {}
         for rid in candidate_room_ids:
@@ -330,7 +330,7 @@ class SemanticPalace:
                 # Weighted-average lift over 1-hop neighbors of mem's room
                 num = 0.0
                 den = 0.0
-                for neighbor, edge in self.get_neighbors(mem.room_id or rid):
+                for neighbor, edge in self.get_neighbors(rid):
                     w = max(0.0, min(1.0, edge.strength))
                     num += room_scores.get(neighbor.id, 0.0) * w
                     den += w
