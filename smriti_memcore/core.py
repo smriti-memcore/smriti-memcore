@@ -78,6 +78,7 @@ class SMRITI:
         self.palace = SemanticPalace(
             vector_store=self.vector_store,
             storage_path=os.path.join(self.config.storage_path, "palace"),
+            config=self.config,
         )
 
         # FTS index — expendable derived index, self-heals via rebuild

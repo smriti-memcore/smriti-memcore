@@ -78,8 +78,14 @@ class SemanticPalace:
     3. Cluster coherence — related memories mutually reinforce retrieval
     """
 
-    def __init__(self, vector_store: VectorStore, storage_path: Optional[str] = None):
+    def __init__(
+        self,
+        vector_store: VectorStore,
+        storage_path: Optional[str] = None,
+        config: Optional["SmritiConfig"] = None,
+    ):
         self.vector_store = vector_store
+        self.config = config
         self.storage_path = storage_path
 
         self.rooms: Dict[str, Room] = {}
@@ -274,57 +280,75 @@ class SemanticPalace:
         max_hops: int = 1,
     ) -> List[Memory]:
         """
-        Multi-hop associative search through the palace.
-
-        Spec §6 — accepts precomputed variant embeddings from the caller
-        (RetrievalEngine.retrieve()) to avoid double-embedding the query when
-        FTS5 is also active.
+        Hybrid associative search with per-memory adjacency lift (spec §6).
         """
-        assert len(variants) == len(variant_embeddings), \
-            f"variants and variant_embeddings must align; got {len(variants)} and {len(variant_embeddings)}"
+        assert len(variants) == len(variant_embeddings)
+        if not variant_embeddings:
+            return []
 
-        # Use the first variant (raw query) for room-finding for now;
-        # Task 9 will rework this to score rooms by max-over-variants.
-        primary = variants[0] if variants else ""
-        primary_emb = variant_embeddings[0] if variant_embeddings else None
+        # Spec §6.1 — score every room by max similarity over query variants; clamp ≥ 0.
+        room_scores: Dict[str, float] = {}
+        for rid in self.rooms:
+            centroid = self._room_embeddings.get(rid)
+            if centroid is None:
+                continue
+            best = max(float(np.dot(v, centroid)) for v in variant_embeddings)
+            room_scores[rid] = max(0.0, best)
 
-        entry_rooms = self.find_rooms(primary, top_k=3)
+        # Spec §6.2 — top-N entry rooms (default 5, configurable via self.config).
+        top_k_rooms = getattr(self.config, "entry_rooms_top_k", 5) if hasattr(self, "config") else 5
+        entry_rids = sorted(room_scores, key=lambda r: room_scores[r], reverse=True)[:top_k_rooms]
+
+        # Collect candidate pool: entry rooms ∪ 1-hop neighbors
+        candidate_room_ids = set(entry_rids)
+        if max_hops >= 1:
+            for rid in entry_rids:
+                for neighbor, _edge in self.get_neighbors(rid):
+                    candidate_room_ids.add(neighbor.id)
+
+        # Mark entry/neighbor rooms as visited
+        now = datetime.now()
+        for rid in candidate_room_ids:
+            room = self.rooms.get(rid)
+            if room:
+                room.visit_count += 1
+                room.last_visited = now
+
+        alpha = getattr(self.config, "adjacency_alpha", 0.3) if hasattr(self, "config") else 0.3
+        lift_max = getattr(self.config, "adjacency_lift_max", 1.0) if hasattr(self, "config") else 1.0
+
         candidates: Dict[str, Tuple[Memory, float, int]] = {}
+        for rid in candidate_room_ids:
+            hops = 0 if rid in entry_rids else 1
+            for mem in self.get_room_memories(rid):
+                if not mem.embedding:
+                    continue
+                mem_vec = np.array(mem.embedding)
+                base = max(float(np.dot(v, mem_vec)) for v in variant_embeddings)
+                base = max(0.0, base)  # clamp
 
-        for room in entry_rooms:
-            room.visit_count += 1
-            room.last_visited = datetime.now()
+                # Weighted-average lift over 1-hop neighbors of mem's room
+                num = 0.0
+                den = 0.0
+                for neighbor, edge in self.get_neighbors(mem.room_id or rid):
+                    w = max(0.0, min(1.0, edge.strength))
+                    num += room_scores.get(neighbor.id, 0.0) * w
+                    den += w
+                lift = (num / den) if den > 0 else 0.0
+                lift = min(lift, lift_max)
 
-            for mem in self.get_room_memories(room.id):
-                if mem.embedding and primary_emb is not None:
-                    score = float(np.dot(primary_emb, np.array(mem.embedding)))
-                    if mem.id not in candidates or score > candidates[mem.id][1]:
-                        candidates[mem.id] = (mem, score, 0)
+                score = base * (1.0 + alpha * lift)
+                if mem.id not in candidates or score > candidates[mem.id][1]:
+                    candidates[mem.id] = (mem, score, hops)
 
-            if max_hops >= 1:
-                for neighbor, edge in self.get_neighbors(room.id):
-                    neighbor.visit_count += 1
-                    neighbor.last_visited = datetime.now()
-
-                    for mem in self.get_room_memories(neighbor.id):
-                        if mem.embedding and primary_emb is not None:
-                            score = float(np.dot(primary_emb, np.array(mem.embedding)))
-                            score *= 0.85 * edge.strength
-                            if mem.id not in candidates or score > candidates[mem.id][1]:
-                                candidates[mem.id] = (mem, score, 1)
-
-        sorted_candidates = sorted(
-            candidates.values(),
-            key=lambda x: x[1],
-            reverse=True,
-        )[:top_k]
-
+        sorted_candidates = sorted(candidates.values(), key=lambda x: x[1], reverse=True)[:top_k]
         results = []
         for mem, score, hops in sorted_candidates:
-            mem.retrieval_score = score
+            # Spec §6.1 — write the lift-adjusted score to `relevance_score`, NOT `retrieval_score`.
+            # `retrieval_score` is the multi-factor composite written later by RetrievalEngine.
+            mem.relevance_score = score
             mem.hops = hops
             results.append(mem)
-
         return results
 
     def search_all_rooms(
