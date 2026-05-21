@@ -118,3 +118,72 @@ class TestAutoModeLexical:
         a = m.snippet.find("ALPHA")
         o = m.snippet.find("OMEGA")
         assert a >= 0 and o >= 0 and a < o
+
+
+class TestCosineFallback:
+    """Spec §5.5 — when no sentence shares any query token, pick the sentence with the
+    highest cosine similarity to the raw-query embedding.
+
+    Tests use MOCKED `vector_store.embed()` (spec §9) so behavior is deterministic and
+    not dependent on the sentence-transformer model.
+    """
+
+    def _make_mock_vector_store(self, embedding_map: dict, monkeypatch):
+        """Return a mock vector_store whose .embed(text) returns embedding_map[text]."""
+        import numpy as np
+
+        class MockVS:
+            def embed(self, text):
+                # Default to a zero vector if the test forgot to populate this string
+                return np.array(embedding_map.get(text, [0.0] * 384), dtype=np.float32)
+        return MockVS()
+
+    def test_zero_overlap_uses_cosine_floor(self, make_memory, monkeypatch):
+        """Mocked embeddings so we know exactly which sentence the cosine floor must pick."""
+        import numpy as np
+        from smriti_memcore.snippet import SnippetExtractor
+
+        # Three sentences with NO lexical overlap to the query "xyzzy quux"
+        s_a = "Apples grow on trees in the orchard."
+        s_b = "Bananas are imported from tropical regions year-round."
+        s_c = "Cherries ripen in late summer in the northern hemisphere."
+        # Repeat 3x to push content well above 300-char threshold
+        content = (s_a + " " + s_b + " " + s_c + " ") * 3
+        m = make_memory(content)
+
+        # Embeddings: query is closest to s_b (Bananas/tropical sentence).
+        query_emb = np.array([1.0, 0.0, 0.0] + [0.0] * 381, dtype=np.float32)
+        # Each sentence embedded by mock vector_store.embed() must yield a vector
+        # whose dot product with query_emb gives the desired ordering.
+        embedding_map = {
+            s_a: [0.1, 0.0, 0.0] + [0.0] * 381,
+            s_b: [0.9, 0.0, 0.0] + [0.0] * 381,   # closest
+            s_c: [0.3, 0.0, 0.0] + [0.0] * 381,
+        }
+        mock_vs = self._make_mock_vector_store(embedding_map, monkeypatch)
+        extractor = SnippetExtractor(vector_store=mock_vs)
+
+        extractor.extract(m, ["xyzzy quux"], query_emb, mode="auto")
+        assert m.snippet is not None
+        # The mock guarantees s_b is the highest-cosine sentence
+        assert "Bananas" in m.snippet
+
+    def test_zero_overlap_returns_single_sentence(self, make_memory):
+        """Cosine fallback returns exactly one sentence — not top-2."""
+        import numpy as np
+        from smriti_memcore.snippet import SnippetExtractor
+
+        s_a = "Apples grow on trees in the orchard."
+        s_b = "Bananas are imported from tropical regions year-round."
+        content = (s_a + " " + s_b + " ") * 4
+        m = make_memory(content)
+
+        query_emb = np.array([1.0] + [0.0] * 383, dtype=np.float32)
+        class MockVS:
+            def embed(self, text):
+                return np.array([0.5] + [0.0] * 383, dtype=np.float32)
+        extractor = SnippetExtractor(vector_store=MockVS(), max_sentences=2)
+        extractor.extract(m, ["xyzzy"], query_emb, mode="auto")
+        assert m.snippet is not None
+        # No " … " separator means a single sentence was picked
+        assert "…" not in m.snippet

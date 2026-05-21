@@ -104,8 +104,14 @@ class SnippetExtractor:
         # Spec §5.4 — pick up to max_sentences with score > 0. No zero-score filler.
         positive = [(idx, s) for (idx, s) in scored if s > 0]
         if not positive:
-            # Implemented in Task 6 — for now, leave snippet None and return.
-            # (Task 6 replaces this with the cosine-floor fallback.)
+            # Spec §5.5 — zero-overlap cosine floor.
+            # Cheap rare path: embed each sentence once and pick the closest.
+            # Embeddings are L2-normalized by vector_store.embed() (vector_store.py:120),
+            # so np.dot() is cosine similarity.
+            sentence_embs = [self.vector_store.embed(s) for s in sentences]
+            scores = [float(np.dot(raw_query_embedding, se)) for se in sentence_embs]
+            top_idx = int(np.argmax(scores))
+            memory.snippet = sentences[top_idx]
             return ExtractResult(used_mode="auto")
 
         positive.sort(key=lambda x: (-x[1], x[0]))  # by score desc, then doc order asc
