@@ -1759,25 +1759,33 @@ class TestSmartRecallWiring:
         # Hard to assert without integration; smoke-test that None is accepted.
         retrieval_engine.retrieve("query", rewrite=None, snippet=None)
 
-    def test_relevance_score_does_not_leak_across_recalls(self, smriti):
-        """Spec §6 stale-state guard: if a memory enters the candidate pool via FTS-only
-        (palace.search did not score it this call), its relevance_score must be cleared
-        BEFORE _score_memory consumes it.
+    @pytest.fixture
+    def smriti_for_leakage(self, tmp_dir, mock_llm):
+        """Local copy of the SMRITI fixture from tests/test_core.py — that one isn't
+        in conftest.py so we can't import it. Same pattern: real SMRITI with mocked LLM."""
+        import os
+        from smriti_memcore.models import SmritiConfig
+        from smriti_memcore import SMRITI
+        config = SmritiConfig(storage_path=os.path.join(tmp_dir, "smriti_db"))
+        n = SMRITI(config=config)
+        n.llm = mock_llm
+        n.attention_gate.llm = mock_llm
+        n.consolidation_engine.llm = mock_llm
+        yield n
+        n.close()
 
-        Test setup:
-        1. Seed a memory whose content has a distinctive rare token "tokenxyzzy"
-        2. Pre-set memory.relevance_score = 0.95 to simulate a stale lifted score from
-           a prior recall
-        3. Issue a recall whose query is the rare token — FTS will match, but the
-           vector path likely won't surface this exact memory above the entry-room
-           threshold (the rare token isn't in the embedding's strong-signal direction)
-        4. After recall, assert memory.relevance_score == 0.0 — proving the guard
-           zeroed the stale value
+    def test_relevance_score_does_not_leak_across_recalls(self, smriti_for_leakage, monkeypatch):
+        """Spec §6 stale-state guard: a memory entering the candidate pool via FTS-only
+        (palace.search did not score it) must have its relevance_score cleared BEFORE
+        _score_memory consumes it.
 
-        Uses the full `smriti` fixture (FTS-enabled) — not the retrieval_engine
-        fixture, since the latter may not have FTS wired.
+        To PROVE the FTS-only path is exercised (not just relying on palace.search
+        happening to skip the memory), we monkeypatch palace.search to return an empty
+        list. The memory then can only enter the candidate pool via FTS, exercising the
+        stale-state guard. Final assertion is the strict `== 0.0`.
         """
         from smriti_memcore.models import MemorySource
+        smriti = smriti_for_leakage
 
         # Seed memory with a rare lexical token + over-threshold content length
         mid = smriti.encode(
@@ -1789,24 +1797,27 @@ class TestSmartRecallWiring:
             pytest.skip("attention gate discarded the seeded memory")
 
         mem = smriti.palace.memories[mid]
-        # Stamp the stale value
+        # Stamp the stale value — simulates a leaked lifted score from a prior recall
         mem.relevance_score = 0.95
         assert mem.relevance_score == 0.95  # sanity
 
-        # Issue a recall keyed on the rare token. FTS matches; if palace.search also
-        # scores it, palace.search overwrites the 0.95 with its own value. If FTS-only,
-        # the guard in retrieve() must zero it before _score_memory runs.
-        smriti.recall("tokenxyzzy", rewrite="none", snippet="none", top_k=10)
+        # FORCE the FTS-only path: stub palace.search to return [] so the memory cannot
+        # enter via the vector pipeline. It must arrive via FTS, where the guard fires.
+        monkeypatch.setattr(smriti.palace, "search", lambda *a, **k: [])
 
-        # Strict assertion per spec — the stale 0.95 cannot survive. Either the guard
-        # zeroed it (FTS-only path) or palace.search overwrote it (palace-hit path).
-        # In both cases the value can't be 0.95.
-        assert mem.relevance_score != 0.95, (
-            f"stale relevance_score=0.95 survived a recall; got {mem.relevance_score}"
+        results = smriti.recall("tokenxyzzy", rewrite="none", snippet="none", top_k=10)
+
+        # The memory must appear in results (FTS found it via the rare token)
+        assert any(m.id == mid for m in results), (
+            "FTS-only path didn't surface the rare-token memory — test setup is wrong, "
+            "OR FTS isn't wired in this SMRITI instance"
         )
-        # Additional invariant: the value is bounded [0, ~1] (clamped + cosine range)
-        assert 0.0 <= mem.relevance_score <= 1.5, (
-            f"relevance_score out of expected range: {mem.relevance_score}"
+
+        # STRICT assertion: the stale 0.95 must have been cleared to exactly 0.0 by the
+        # guard. palace.search returned []; nothing else writes relevance_score in retrieve().
+        assert mem.relevance_score == 0.0, (
+            f"stale-state guard failed: expected relevance_score == 0.0 after FTS-only "
+            f"recall, got {mem.relevance_score}"
         )
 ```
 
