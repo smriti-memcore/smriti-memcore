@@ -113,14 +113,25 @@ class QueryRewriter:
             logger.warning(f"QueryRewriter LLM call failed: {e}; falling back to auto")
             return ExpandResult(variants=self._lexical_variants(query), used_mode="auto", fallback=True)
 
-        if not isinstance(raw, list):
-            logger.warning(f"QueryRewriter LLM returned non-list ({type(raw).__name__}); falling back to auto")
+        # Accept either {"variants": [...]} (preferred — matches generate_json's dict-recovery
+        # fallback for prose-wrapped responses) or a raw list (some prompts emit it directly).
+        # generate_json returns {"error": ...} on parse failure; that hits the non-list branch
+        # below and falls back cleanly.
+        if isinstance(raw, dict) and isinstance(raw.get("variants"), list):
+            items = raw["variants"]
+        elif isinstance(raw, list):
+            items = raw
+        else:
+            logger.warning(
+                f"QueryRewriter LLM returned unexpected shape ({type(raw).__name__}); "
+                "falling back to auto"
+            )
             return ExpandResult(variants=self._lexical_variants(query), used_mode="auto", fallback=True)
 
         # Filter empty/whitespace and deduplicate (preserving order), drop entries equal to raw query
         seen = {query}
         cleaned: List[str] = [query]
-        for item in raw:
+        for item in items:
             if not isinstance(item, str):
                 continue
             s = item.strip()
@@ -143,8 +154,9 @@ class QueryRewriter:
 
     def _build_prompt(self, query: str) -> str:
         return (
-            "Given this user query, generate exactly 3 paraphrased variants that preserve\n"
-            "meaning but use different wording. Return as a JSON list of strings.\n\n"
+            "Given this user query, generate exactly 3 paraphrased variants that\n"
+            "preserve meaning but use different wording. Return a JSON object of\n"
+            "the form {\"variants\": [\"...\", \"...\", \"...\"]} — no prose, no markdown.\n\n"
             f"Query: {query}\n"
-            "Variants:"
+            "Output JSON:"
         )

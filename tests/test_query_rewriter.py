@@ -170,3 +170,32 @@ class TestLLMMode:
         qr.expand("q1", mode="llm")        # 4 calls — cache miss, LRU evicted
         qr.expand("q2", mode="llm")        # 4 still — q2 was evicted by q1
         assert fake_llm.calls == 5
+
+    def test_llm_accepts_dict_with_variants_key(self, fake_llm):
+        """The robust prompt asks for {'variants': [...]} — accept that shape."""
+        from smriti_memcore.query_rewriter import QueryRewriter
+        fake_llm.return_value = {"variants": ["paraphrase a", "paraphrase b"]}
+        qr = QueryRewriter(llm=fake_llm)
+        r = qr.expand("raw query", mode="llm")
+        assert r.fallback is False
+        assert r.used_mode == "llm"
+        assert "paraphrase a" in r.variants
+        assert "paraphrase b" in r.variants
+
+    def test_llm_dict_without_variants_key_falls_back(self, fake_llm):
+        """A dict without a 'variants' list key is treated as malformed."""
+        from smriti_memcore.query_rewriter import QueryRewriter
+        fake_llm.return_value = {"other_key": ["x", "y"]}
+        qr = QueryRewriter(llm=fake_llm)
+        r = qr.expand("raw query", mode="llm")
+        assert r.fallback is True
+        assert r.used_mode == "auto"
+
+    def test_llm_error_dict_falls_back(self, fake_llm):
+        """generate_json returns {'error': ...} on JSON parse failure — must fall back."""
+        from smriti_memcore.query_rewriter import QueryRewriter
+        fake_llm.return_value = {"error": "Failed to parse JSON"}
+        qr = QueryRewriter(llm=fake_llm)
+        r = qr.expand("raw query", mode="llm")
+        assert r.fallback is True
+        assert r.used_mode == "auto"
