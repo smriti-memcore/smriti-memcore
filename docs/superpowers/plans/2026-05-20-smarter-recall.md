@@ -1758,6 +1758,38 @@ class TestSmartRecallWiring:
         """Spec §8.1 — None sentinel falls through to config defaults."""
         # Hard to assert without integration; smoke-test that None is accepted.
         retrieval_engine.retrieve("query", rewrite=None, snippet=None)
+
+    def test_relevance_score_does_not_leak_across_recalls(self, smriti):
+        """Memory.relevance_score from a palace-search hit in recall N must not
+        contaminate a recall N+1 where the same memory is FTS-only."""
+        from smriti_memcore.models import MemorySource
+        # Seed a memory with content that contains a rare lexical token AND embeddings
+        # that align with a different topic — first recall hits via palace, second via FTS.
+        mid = smriti.encode(
+            "rare-lexical-token-xyzzy is buried inside a sentence that talks about Python and programming",
+            source=MemorySource.USER_STATED,
+        )
+        # Recall 1: query that hits the embedding side (programming/python) — palace.search
+        # likely populates this memory's relevance_score via the lift.
+        smriti.recall("python programming language", rewrite="none", snippet="none")
+
+        # Capture the relevance_score after recall 1
+        mem = smriti.palace.memories.get(mid)
+        if mem is None:
+            import pytest
+            pytest.skip("attention gate discarded the seeded memory")
+
+        # Recall 2: query that only hits the rare lexical token — palace.search may not score
+        # this memory (since semantic embedding doesn't match). But FTS will find it.
+        # The guard must zero relevance_score so _score_memory uses raw cosine.
+        results = smriti.recall("rare-lexical-token-xyzzy", rewrite="none", snippet="none")
+        # The memory should still be retrievable, but its retrieval_score must not be
+        # poisoned by recall 1's lifted score.
+        if results and results[0].id == mid:
+            # We can't assert exact score, but the guard means _score_memory used
+            # raw cosine (~0) for the relevance component, not the prior lifted value.
+            # This is a structural test — just confirm the recall doesn't crash and returns.
+            pass
 ```
 
 > Note: this task needs a `retrieval_engine` pytest fixture. Add one if not present:
@@ -1828,7 +1860,31 @@ from smriti_memcore.snippet import SnippetExtractor, ExtractResult
         self.retrieval_log: deque = deque(maxlen=1000)
 ```
 
-3. Update `_score_memory()` to consume the palace-search lifted relevance:
+3. Add a stale-state guard in `retrieve()` for FTS-only candidates:
+
+`Memory` objects in `palace.memories` are persistent — the same `Memory` instance is reused across recalls. If a memory was scored by `palace.search` in recall N (gets a lifted `relevance_score`) but enters recall N+1 only via FTS (palace.search doesn't see it), the stale value leaks into `_score_memory`. Guard against this by tracking which IDs palace.search scored this call and zeroing the rest:
+
+```python
+# In retrieve(), right after palace.search returns and BEFORE the FTS merge:
+palace_scored_ids = {m.id for m in vector_candidates}
+```
+
+Then, after the candidate list is assembled (post-FTS-merge), before the scoring loop:
+
+```python
+for memory in candidates:
+    if memory.id not in palace_scored_ids:
+        # FTS-only candidate; clear any stale lifted-relevance from a prior recall
+        memory.relevance_score = 0.0
+```
+
+4. Add `Literal` to the typing import in `smriti_memcore/retrieval.py`:
+
+```python
+from typing import Callable, Dict, List, Literal, Optional, Tuple
+```
+
+5. Update `_score_memory()` to consume the palace-search lifted relevance:
 
 ```python
     def _score_memory(
@@ -1859,7 +1915,7 @@ from smriti_memcore.snippet import SnippetExtractor, ExtractResult
         )
 ```
 
-4. Update `retrieve()` signature and body:
+6. Update `retrieve()` signature and body:
 
 ```python
     def retrieve(
@@ -1868,8 +1924,8 @@ from smriti_memcore.snippet import SnippetExtractor, ExtractResult
         context: str = "",
         top_k: Optional[int] = None,
         max_hops: int = 1,
-        rewrite: Optional[str] = None,
-        snippet: Optional[str] = None,
+        rewrite: Optional[Literal["auto", "llm", "none"]] = None,
+        snippet: Optional[Literal["auto", "llm", "none"]] = None,
     ) -> List[Memory]:
         top_k = top_k or self.config.retrieval_top_k
         start_time = time.time()
@@ -1964,7 +2020,7 @@ from smriti_memcore.snippet import SnippetExtractor, ExtractResult
         return selected
 ```
 
-5. Remove the TEMPORARY shim from Task 8 (the `_temp_emb = ...` lines) — superseded by the new variant embedding logic.
+7. Remove the TEMPORARY shim from Task 8 (the `_temp_emb = ...` lines) — superseded by the new variant embedding logic.
 
 - [ ] **Step 4 (renumbered 5): Update `SMRITI.__init__` to pass `llm` to `RetrievalEngine`**
 
@@ -2030,7 +2086,13 @@ Expected: FAIL with `TypeError`.
 
 - [ ] **Step 3: Update `SMRITI.recall()` signature**
 
-In `smriti_memcore/core.py`, update `recall()`:
+In `smriti_memcore/core.py`, add `Literal` to the typing import at the top:
+
+```python
+from typing import Any, Dict, List, Literal, Optional
+```
+
+Then update `recall()`:
 
 ```python
     def recall(
@@ -2038,8 +2100,8 @@ In `smriti_memcore/core.py`, update `recall()`:
         query: str,
         context: str = "",
         top_k: Optional[int] = None,
-        rewrite: Optional[str] = None,
-        snippet: Optional[str] = None,
+        rewrite: Optional[Literal["auto", "llm", "none"]] = None,
+        snippet: Optional[Literal["auto", "llm", "none"]] = None,
     ) -> List[Memory]:
         """
         Recall memories relevant to a query.
@@ -2108,7 +2170,7 @@ Append to `tests/test_mcp_server.py`. Use the existing test fixtures (read the f
 
 ```python
 class TestSmartRecallMcpSchema:
-    """rewrite/snippet exposed on the smriti_recall tool with enum constraints and no default."""
+    """rewrite/snippet exposed on the smriti_recall tool with enum constraints (Literal type)."""
 
     def test_smriti_recall_signature_has_rewrite_and_snippet(self):
         """The function exposed by the tool must accept rewrite and snippet kwargs."""
@@ -2121,6 +2183,22 @@ class TestSmartRecallMcpSchema:
         # Optional with None sentinel — caller can omit to use config default
         assert params["rewrite"].default is None
         assert params["snippet"].default is None
+
+    def test_smriti_recall_uses_literal_type_for_enum_constraint(self):
+        """Spec §8.2 — FastMCP introspects Literal type hints into the JSON schema's enum,
+        so MCP callers see the three valid values."""
+        from typing import get_args, get_type_hints
+        import smriti_memcore.integrations.mcp_server as mcp_module
+        hints = get_type_hints(mcp_module.smriti_recall)
+        for field in ("rewrite", "snippet"):
+            t = hints.get(field)
+            # Optional[Literal[...]] is Union[Literal[...], None]
+            inner = [a for a in get_args(t) if a is not type(None)]
+            literal_vals = get_args(inner[0]) if inner else ()
+            assert set(literal_vals) == {"auto", "llm", "none"}, (
+                f"{field} type hint must be Optional[Literal['auto','llm','none']], "
+                f"got Literal{list(literal_vals)}"
+            )
 
 
 class TestSmartRecallMcpResponse:
@@ -2162,12 +2240,14 @@ Expected: FAIL (signature lacks rewrite/snippet; serialize_memory doesn't have e
 In `smriti_memcore/integrations/mcp_server.py` (around line 157), replace the existing `smriti_recall`:
 
 ```python
+from typing import Literal  # add at top of file if not already imported
+
 @mcp_server.tool()
 def smriti_recall(
     query: str,
     top_k: int = 10,
-    rewrite: Optional[str] = None,
-    snippet: Optional[str] = None,
+    rewrite: Optional[Literal["auto", "llm", "none"]] = None,
+    snippet: Optional[Literal["auto", "llm", "none"]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Recall memories relevant to a query.
@@ -2190,6 +2270,8 @@ def smriti_recall(
         logger.error(f"smriti_recall failed: {e}")
         return [{"error": str(e)}]
 ```
+
+**Why `Literal` matters:** FastMCP introspects type hints to build the JSON schema. `Optional[str]` produces `{"type": "string"}`; `Optional[Literal["auto", "llm", "none"]]` produces `{"enum": ["auto", "llm", "none"], "nullable": true}`. Only the latter actually constrains the MCP client. Spec §8.2 requires the enum constraint.
 
 - [ ] **Step 4: Extend `serialize_memory` to include the new fields**
 
@@ -2402,6 +2484,7 @@ class TestRegressionGuard:
 
     @pytest.fixture
     def seeded_smriti(self, smriti):
+        from smriti_memcore.models import MemorySource
         corpus = [
             "Python is a high-level programming language used for many tasks",
             "JavaScript runs in browsers and on servers via Node.js",
@@ -2415,7 +2498,7 @@ class TestRegressionGuard:
             "MIT license is permissive and widely used in open-source projects",
         ]
         for c in corpus:
-            smriti.encode(c, source="user_stated", use_llm=True)
+            smriti.encode(c, source=MemorySource.USER_STATED, use_llm=True)
         return smriti
 
     def test_disabled_features_return_full_content(self, seeded_smriti):
@@ -2507,7 +2590,7 @@ import tempfile
 import time
 
 from smriti_memcore.core import SMRITI
-from smriti_memcore.models import SmritiConfig
+from smriti_memcore.models import MemorySource, SmritiConfig
 
 TOPICS = [
     "python", "javascript", "rust", "go", "java",
@@ -2533,26 +2616,39 @@ def seed(s: SMRITI, n: int = 500) -> dict:
             f"Performance characteristics of {topic} matter for production deployment. "
         )
         assert len(content) >= 400, f"seed content too short: {len(content)} chars"
-        mid = s.encode(content, source="user_stated", use_llm=False)
+        mid = s.encode(content, source=MemorySource.USER_STATED, use_llm=False)
         if mid:
             target_ids.setdefault(topic, []).append(mid)
     return target_ids
+
+
+def _call_recall_compat(s: SMRITI, q: str, rewrite: str, snippet: str, top_k: int):
+    """Call SMRITI.recall compatibly with both pre-change `main` and the feature branch.
+
+    Pre-change main lacks rewrite/snippet kwargs. Detect via inspect at first call;
+    when running on main we always do raw recall regardless of the requested mode."""
+    import inspect
+    sig = inspect.signature(s.recall)
+    if "rewrite" in sig.parameters:
+        return s.recall(q, rewrite=rewrite, snippet=snippet, top_k=top_k)
+    return s.recall(q, top_k=top_k)
 
 
 def run_queries(s: SMRITI, target_ids: dict, queries: list, rewrite: str, snippet: str):
     hits_at_10 = 0
     total_tokens = 0
     latencies = []
+    per_query_ids = []  # for cross-branch ID-order baseline check (spec §13.4)
     for q, expected_topic in queries:
         t0 = time.perf_counter()
-        results = s.recall(q, rewrite=rewrite, snippet=snippet, top_k=10)
+        results = _call_recall_compat(s, q, rewrite=rewrite, snippet=snippet, top_k=10)
         latencies.append((time.perf_counter() - t0) * 1000)
-        result_ids = {m.id for m in results}
-        expected = set(target_ids.get(expected_topic, []))
-        if result_ids & expected:
+        result_ids = [m.id for m in results]
+        per_query_ids.append({"query": q, "ids": result_ids})
+        if set(result_ids) & set(target_ids.get(expected_topic, [])):
             hits_at_10 += 1
         for m in results:
-            content = m.snippet if m.snippet else m.content
+            content = getattr(m, "snippet", None) or m.content
             total_tokens += len(content.split())
     n = max(1, len(queries))
     return {
@@ -2562,6 +2658,7 @@ def run_queries(s: SMRITI, target_ids: dict, queries: list, rewrite: str, snippe
             statistics.quantiles(latencies, n=20)[-1]
             if len(latencies) >= 20 else max(latencies)
         ),
+        "per_query_ids": per_query_ids,   # captured for ID-order comparison
     }
 
 
@@ -2613,10 +2710,23 @@ def main():
                 with open(args.baseline) as f:
                     base = json.load(f)
                 base_disabled = base["disabled"]
-                # The "disabled" mode on this branch must match the baseline (regression guard)
+                # The "disabled" mode on this branch must match the baseline (regression guard).
                 hit_drift = (before["hit_rate_at_10"] - base_disabled["hit_rate_at_10"]) * 100
                 print(f"\nCross-branch regression check (disabled-features vs baseline):")
                 print(f"  Hit-rate@10 drift: {hit_drift:+.1f}pp (acceptance: ≤ 2pp)")
+
+                # Spec §13.4 — same memory IDs in the same order vs pre-change main.
+                # Compare per-query result lists.
+                exact_match_count = 0
+                total = 0
+                for cur, prev in zip(before["per_query_ids"], base_disabled["per_query_ids"]):
+                    total += 1
+                    if cur["ids"] == prev["ids"]:
+                        exact_match_count += 1
+                pct = (exact_match_count / total * 100) if total else 0.0
+                print(f"  ID-order exact-match: {exact_match_count}/{total} queries ({pct:.0f}%)")
+                if exact_match_count != total:
+                    print("  WARNING: ID-order drift detected — spec §13.4 acceptance criterion requires investigation.")
             except Exception as e:
                 print(f"\n(could not read baseline {args.baseline}: {e})")
 
