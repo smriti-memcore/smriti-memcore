@@ -314,7 +314,7 @@ New fields on `SmritiConfig`:
 # Smarter recall
 rewrite_mode_default: str = "auto"           # "auto" | "llm" | "none"
 snippet_mode_default: str = "auto"
-snippet_min_chars: int = 300                 # below this, return content as-is
+snippet_min_chars: int = 300                 # at or below this, return content as-is (§5.4 uses ≤)
 snippet_max_sentences: int = 2
 llm_rewrite_cache_size: int = 100
 llm_rewrite_prompt_version: str = "v1"       # cache-key component
