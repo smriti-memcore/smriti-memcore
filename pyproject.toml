@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smriti-memcore"
-version = "1.3.0"
+version = "1.4.0.dev0"
 description = "A neuro-inspired memory architecture for AI agents — combines a Semantic Palace graph, capacity-bounded Working Memory, and asynchronous consolidation."
 readme = "README.md"
 license = {text = "MIT"}
