@@ -600,9 +600,13 @@ def amp_recall(
 
     Returns {results: [{id, content, score, timestamp, status}, ...]}.
     Archived memories are excluded by default.
+
+    Note: passes snippet="none" so memory.content is the full text (AMP contract)
+    AND so memory.snippet doesn't get populated as a side effect (which would leak
+    into subsequent serialize_memory() calls — see code-review issue Important #1).
     """
     try:
-        memories = _smriti.recall(query, top_k=top_k)
+        memories = _smriti.recall(query, top_k=top_k, snippet="none")
         results = [
             {
                 "id": m.id,

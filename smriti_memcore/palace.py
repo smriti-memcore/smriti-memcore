@@ -298,6 +298,7 @@ class SemanticPalace:
         # Spec §6.2 — top-N entry rooms (default 5, configurable via self.config).
         top_k_rooms = getattr(self.config, "entry_rooms_top_k", 5)
         entry_rids = sorted(room_scores, key=lambda r: room_scores[r], reverse=True)[:top_k_rooms]
+        entry_rids_set = set(entry_rids)  # O(1) hops-check below
 
         # Collect candidate pool: entry rooms ∪ 1-hop neighbors
         candidate_room_ids = set(entry_rids)
@@ -319,7 +320,7 @@ class SemanticPalace:
 
         candidates: Dict[str, Tuple[Memory, float, int]] = {}
         for rid in candidate_room_ids:
-            hops = 0 if rid in entry_rids else 1
+            hops = 0 if rid in entry_rids_set else 1
             for mem in self.get_room_memories(rid):
                 if not mem.embedding:
                     continue
