@@ -49,7 +49,7 @@ def compute_accuracy(prediction: str, ground_truth: str) -> float:
 from datetime import datetime
 from smriti_memcore.models import Episode, SalienceScore, MemorySource
 
-def process_case_smriti(test_case: Dict[str, Any], temp_dir: str, hybrid: bool = True, llm=None, smriti_model: str = "mistral") -> Dict[str, Any]:
+def process_case_smriti(test_case: Dict[str, Any], temp_dir: str, hybrid: bool = True, llm=None, smriti_model: str = "mistral", rewrite_mode: str = "auto", snippet_mode: str = "auto") -> Dict[str, Any]:
     """Runs a single LongMemEval case through a SMRITI-augmented LangChain agent."""
 
     import os
@@ -57,7 +57,12 @@ def process_case_smriti(test_case: Dict[str, Any], temp_dir: str, hybrid: bool =
 
     # 1. Initialize SMRITI — use the same Anthropic model for consolidation LLM calls
     db_path = os.path.join(temp_dir, f"smriti_db_{test_case['question_id']}")
-    config = SmritiConfig(storage_path=db_path, llm_model=smriti_model)
+    config = SmritiConfig(
+        storage_path=db_path,
+        llm_model=smriti_model,
+        rewrite_mode_default=rewrite_mode,
+        snippet_mode_default=snippet_mode,
+    )
     smriti_engine = SMRITI(config=config)
     if not hybrid:
         smriti_engine.retrieval_engine.fts_index = None
@@ -232,6 +237,12 @@ def main():
                         help="Ollama/LLM model for SMRITI consolidation calls (default: mistral)")
     parser.add_argument("--output", type=str, default="results/longmemeval_results.json",
                         help="Path to write JSON results (default: results/longmemeval_results.json)")
+    parser.add_argument("--rewrite-mode", dest="rewrite_mode", default="auto",
+                        choices=["auto", "llm", "none"],
+                        help="Smarter-recall query rewriting mode (default: auto). 'none' disables.")
+    parser.add_argument("--snippet-mode", dest="snippet_mode", default="auto",
+                        choices=["auto", "llm", "none"],
+                        help="Smarter-recall snippet extraction mode (default: auto). 'none' disables.")
     args = parser.parse_args()
 
     llm_model = args.llm_model or DEFAULT_MODELS[args.llm]
@@ -257,7 +268,14 @@ def main():
             if args.baseline:
                 res = process_case_baseline(case, llm=llm)
             else:
-                res = process_case_smriti(case, temp_dir, hybrid=(args.mode == "hybrid"), llm=llm, smriti_model=args.smriti_model)
+                res = process_case_smriti(
+                    case, temp_dir,
+                    hybrid=(args.mode == "hybrid"),
+                    llm=llm,
+                    smriti_model=args.smriti_model,
+                    rewrite_mode=args.rewrite_mode,
+                    snippet_mode=args.snippet_mode,
+                )
             results.append(res)
 
     # Aggregate and print results
@@ -265,12 +283,13 @@ def main():
     avg_latency = sum(r['latency'] for r in results) / len(results)
 
     llm_label = f"{args.llm}/{llm_model}"
+    smart_tag = f"rewrite={args.rewrite_mode},snippet={args.snippet_mode}"
     if args.baseline:
         method_label = f"Baseline (full context) [{llm_label}]"
     elif args.mode == "hybrid":
-        method_label = f"SMRITI hybrid (FTS+RRF) [{llm_label}]"
+        method_label = f"SMRITI hybrid (FTS+RRF) [{smart_tag}] [{llm_label}]"
     else:
-        method_label = f"SMRITI vector-only [{llm_label}]"
+        method_label = f"SMRITI vector-only [{smart_tag}] [{llm_label}]"
 
     print("=" * 40)
     print(f"LONGMEMEVAL EVALUATION COMPLETE")
