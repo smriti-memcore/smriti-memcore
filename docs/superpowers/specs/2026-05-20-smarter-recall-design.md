@@ -116,19 +116,22 @@ Caller embeds each variant once.
 
 ### 4.3 `mode="llm"` — paraphrase via LLM
 
-Single `generate_json` call to the configured LLM:
+Single `generate_json` call to the configured LLM. The prompt asks for a dict-shaped JSON `{"variants": [...]}` because `LLMInterface.generate_json` returns `Dict[str, Any]` (its bracket-recovery fallback only handles `{}` not `[]`, so prose-wrapped responses parse cleanly when the LLM emits a dict):
 
 ```
-Given this user query, generate exactly 3 paraphrased variants that preserve
-meaning but use different wording. Return as a JSON list of strings.
+Given this user query, generate exactly 3 paraphrased variants that
+preserve meaning but use different wording. Return a JSON object of
+the form {"variants": ["...", "...", "..."]} — no prose, no markdown.
 
 Query: {query}
-Variants:
+Output JSON:
 ```
+
+**Accepted response shapes:** `_llm_expand` accepts either `{"variants": [...]}` (preferred — what the prompt asks for) or a bare list `[...]` (backward-compat for LLMs that ignore the dict instruction). Anything else (other dict keys, scalars, error dicts like `{"error": "..."}`) triggers the auto fallback.
 
 Returned variants are concatenated to the raw query and deduped, so the final list contains the raw query plus up to 3 distinct paraphrases. If the LLM returns fewer than 3 distinct items (or some are empty / equal to the raw query after stripping), the final variant count may be 1-4; that's acceptable. Empty strings and whitespace-only entries are dropped.
 
-**Failure handling:** if the LLM call raises, times out, returns non-JSON, returns a non-list, or returns a list with zero usable strings after dedupe, log a warning, set `fallback=True`, and fall back to `mode="auto"`. No partial-LLM result is kept.
+**Failure handling:** if the LLM call raises, times out, returns non-JSON, returns a shape neither dict-with-variants nor bare-list, or returns a list with zero usable strings after dedupe, log a warning, set `fallback=True`, and fall back to `mode="auto"`. No partial-LLM result is kept.
 
 ### 4.4 LLM cache
 
