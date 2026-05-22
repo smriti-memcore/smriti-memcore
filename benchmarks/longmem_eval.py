@@ -27,11 +27,14 @@ DEFAULT_MODELS = {
 
 
 def make_llm(provider: str, model: str):
+    # max_retries=10 with exponential backoff so transient 429/529 (Anthropic
+    # overloaded) doesn't kill a long benchmark run. Default in both ChatOpenAI
+    # and ChatAnthropic is 2 retries — too few for a 50-case run during peak.
     if provider == "ollama":
-        return ChatOpenAI(base_url=OLLAMA_BASE_URL, api_key="ollama", model=model, temperature=0.0)
+        return ChatOpenAI(base_url=OLLAMA_BASE_URL, api_key="ollama", model=model, temperature=0.0, max_retries=10)
     if provider == "anthropic":
-        return ChatAnthropic(model=model, temperature=0.0)
-    return ChatOpenAI(model=model, temperature=0.0)
+        return ChatAnthropic(model=model, temperature=0.0, max_retries=10)
+    return ChatOpenAI(model=model, temperature=0.0, max_retries=10)
 
 # Simple exact/fuzzy match for evaluation
 def compute_accuracy(prediction: str, ground_truth: str) -> float:
