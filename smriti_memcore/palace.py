@@ -22,7 +22,7 @@ from smriti_memcore.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 
-PALACE_SCHEMA_VERSION = 2
+PALACE_SCHEMA_VERSION = 3
 
 
 @dataclass
@@ -408,6 +408,10 @@ class SemanticPalace:
                 r.setdefault("visibility", "shared")
             for m in state.get("memories", {}).values():
                 m.setdefault("visibility", "shared")
+        if version < 3:
+            logger.info("Migrating palace from schema v2 → v3 (stripping inline embeddings)")
+            for m in state.get("memories", {}).values():
+                m.pop("embedding", None)
         state["schema_version"] = PALACE_SCHEMA_VERSION
         return state
 
@@ -481,7 +485,7 @@ class SemanticPalace:
                 memory = Memory(
                     id=mid,
                     content=mdata.get("content", ""),
-                    embedding=mdata.get("embedding"),
+                    embedding=None,  # populated from VectorStore after all memories are loaded (see below)
                     modality=Modality(mdata.get("modality", "text")),
                     source=MemorySource(mdata.get("source", "direct")),
                     status=MemoryStatus(mdata.get("status", "active")),
@@ -510,6 +514,13 @@ class SemanticPalace:
                     visibility=Visibility(mdata.get("visibility", "shared")),
                 )
                 self.memories[mid] = memory
+
+            # Repopulate in-memory embeddings from VectorStore (not persisted in palace.json since v3)
+            for mid, memory in self.memories.items():
+                if memory.embedding is None:
+                    entry = self.vector_store.get(f"mem:{mid}")
+                    if entry is not None:
+                        memory.embedding = entry.vector.tolist()
 
             self.landmarks = state.get("landmarks", [])
 

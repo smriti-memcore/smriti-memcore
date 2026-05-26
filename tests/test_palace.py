@@ -194,3 +194,51 @@ class TestHealth:
         assert "room_count" in health
         assert "memory_count" in health
         assert health["memory_count"] == 1
+
+
+class TestEmbeddingStrip:
+    """palace.json must not contain embedding vectors."""
+
+    def test_to_dict_omits_embedding(self):
+        """Memory.to_dict() must not include the 'embedding' key."""
+        from smriti_memcore.models import Memory
+        m = Memory(content="hello")
+        m.embedding = [0.1] * 384
+        d = m.to_dict()
+        assert "embedding" not in d, "to_dict() must not serialise raw embedding vectors"
+
+    def test_save_does_not_write_embedding_to_palace_json(self, palace, make_memory, tmp_dir):
+        """Saved palace.json must not contain any 'embedding' key."""
+        import json, os
+        palace.place_memory(make_memory("the quick brown fox"))
+        palace.save()
+
+        palace_file = os.path.join(tmp_dir, "palace", "palace.json")
+        with open(palace_file) as f:
+            data = json.load(f)
+        for mid, mdata in data.get("memories", {}).items():
+            assert "embedding" not in mdata, f"memory {mid} still has embedding in palace.json"
+
+    def test_round_trip_embedding_available_after_load(self, tmp_dir, vector_store, make_memory):
+        """After save+load, memory.embedding must be populated from VectorStore (not palace.json)."""
+        import os
+        from smriti_memcore.palace import SemanticPalace
+
+        palace = SemanticPalace(
+            vector_store=vector_store,
+            storage_path=os.path.join(tmp_dir, "palace"),
+        )
+        mem = make_memory("the quick brown fox")
+        palace.place_memory(mem)
+        mid = mem.id
+        palace.save()
+
+        # Fresh palace from the same storage — embeddings must be repopulated from VectorStore
+        palace2 = SemanticPalace(
+            vector_store=vector_store,
+            storage_path=os.path.join(tmp_dir, "palace"),
+        )
+        loaded = palace2.memories.get(mid)
+        assert loaded is not None
+        assert loaded.embedding is not None, "embedding must be repopulated from VectorStore on load"
+        assert len(loaded.embedding) == 384

@@ -165,7 +165,7 @@ class Memory:
         return {
             "id": self.id,
             "content": self.content,
-            "embedding": self.embedding,
+            # "embedding" intentionally omitted — persisted in vectors.npy only (palace.json schema v3+)
             "modality": self.modality.value,
             "source": self.source.value,
             "status": self.status.value,

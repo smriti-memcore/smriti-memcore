@@ -85,6 +85,13 @@ mcp_server = FastMCP(
         "Exposes 12 native smriti_* tools and 6 AMP alias tools (amp.encode … amp.stats). "
         "Single-tenant: agent_id is accepted on AMP verbs but ignored; "
         "isolation is at the storage-path level."
+        "\n\n"
+        "Encoding discipline: when calling smriti_encode or amp.encode, label "
+        "unverified claims as hypotheses ('hypothesis:', 'likely', 'unverified') "
+        "until they are verified against code, output, or commit — and cite the "
+        "evidence (file:line, sha, tool-output id) for any factual claim. A "
+        "confidently-worded but wrong memory becomes a liability for future "
+        "sessions."
     ),
 )
 
@@ -130,6 +137,13 @@ def smriti_encode(
             "inferred", or "external"
     modality: "text" (default), "code", "image", "structured"
     private: if True, memory is marked private and excluded from team consolidation sync
+
+    IMPORTANT — encoding discipline. Label unverified diagnoses as hypotheses,
+    not facts. Cite the evidence (file:line, sha, tool output) for any factual
+    claim. A fix that made one test pass is a hypothesis with a passing test,
+    not a confirmed root cause. Re-label or remove memories that turn out wrong
+    rather than leaving confident-but-stale claims in the store — recalls treat
+    them as truth.
     """
     try:
         mem_source = MemorySource(source)
@@ -488,6 +502,13 @@ def amp_encode(
     force=True bypasses the salience gate and always stores.
     private=True marks the memory as private (excluded from team consolidation sync).
     Returns {status: "stored", id: "..."} or {status: "below_threshold"}.
+
+    IMPORTANT — encoding discipline. Label unverified diagnoses as hypotheses,
+    not facts. Cite the evidence (file:line, sha, tool output) for any factual
+    claim. A fix that made one test pass is a hypothesis with a passing test,
+    not a confirmed root cause. Re-label or remove memories that turn out wrong
+    rather than leaving confident-but-stale claims in the store — recalls treat
+    them as truth.
     """
     if not content or not content.strip():
         return {"error": "content must not be empty", "amp_error_code": "invalid_request"}

@@ -7,16 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-05-26
+
 ### Added
 - **`Visibility` enum** (`private` / `shared`) on `Memory` and `Room` — controls team consolidation sync eligibility
 - `private=True` parameter on `smriti_encode` and `amp.encode` — Claude marks a memory private when the user requests it
 - `smriti_create_private_room(topic)` MCP tool — creates a room with `visibility=PRIVATE`; memories placed in it are personal and excluded from team sync
 - `SemanticPalace.shared_memories()` helper — returns only `ACTIVE` + `SHARED` memories for safe use by team consolidation
 - Visibility counts (`private_memories`, `shared_memories`) in `smriti_stats` output
+- **Encoding discipline guidance** baked into the MCP `instructions` string and the `smriti_encode` / `amp.encode` tool docstrings — tells consumer LLMs to label unverified diagnoses as hypotheses, cite evidence (file:line, sha, tool-output id) for factual claims, and re-label or remove memories that turn out wrong. Addresses a real failure mode where confidently-worded but unverified diagnoses encoded by one session became liabilities for later sessions
 
 ### Changed
 - `PALACE_SCHEMA_VERSION` bumped to `2`; v1→v2 migration sets all existing memories and rooms to `shared` on first load
 - Conflict resolution in consolidation skips private memories (personal context is not subject to cross-memory contradiction resolution)
+
+### Performance
+- `PALACE_SCHEMA_VERSION` bumped to `3`; embeddings are stripped from `palace.json` on save and lazily recomputed on load — ~10x reduction in on-disk palace size
 
 ### Note
 - Team sync enforcement (blocking private memories from flowing to a team palace) is an enterprise feature; the privacy primitives (`Visibility` enum, `private=True`, `shared_memories()`) are open source

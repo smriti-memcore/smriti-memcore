@@ -47,8 +47,8 @@ class TestVisibilityModel:
 
 
 class TestSchemaMigration:
-    def test_schema_version_is_2(self):
-        assert PALACE_SCHEMA_VERSION == 2
+    def test_schema_version_is_current(self):
+        assert PALACE_SCHEMA_VERSION == 3
 
     def test_v0_migration_sets_visibility_shared(self):
         state = {
@@ -56,7 +56,7 @@ class TestSchemaMigration:
             "memories": {"m1": {"content": "hello"}},
         }
         migrated = SemanticPalace._migrate(state)
-        assert migrated["schema_version"] == 2
+        assert migrated["schema_version"] == PALACE_SCHEMA_VERSION
         assert migrated["rooms"]["r1"]["visibility"] == "shared"
         assert migrated["memories"]["m1"]["visibility"] == "shared"
 
@@ -67,7 +67,7 @@ class TestSchemaMigration:
             "memories": {"m1": {"content": "hello"}},
         }
         migrated = SemanticPalace._migrate(state)
-        assert migrated["schema_version"] == 2
+        assert migrated["schema_version"] == PALACE_SCHEMA_VERSION
         assert migrated["rooms"]["r1"]["visibility"] == "shared"
         assert migrated["memories"]["m1"]["visibility"] == "shared"
 
