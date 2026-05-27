@@ -82,7 +82,7 @@ mcp_server = FastMCP(
     "smriti-memory",
     instructions=(
         "SMRITI memory system — AMP Full-conformant (amp_version: 1.0). "
-        "Exposes 12 native smriti_* tools and 6 AMP alias tools (amp.encode … amp.stats). "
+        "Exposes 14 native smriti_* tools and 6 AMP alias tools (amp.encode … amp.stats). "
         "Single-tenant: agent_id is accepted on AMP verbs but ignored; "
         "isolation is at the storage-path level."
         "\n\n"
@@ -726,7 +726,7 @@ def _startup():
     logger.info(f"Starting SMRITI MCP server (storage: {config.storage_path}, model: {config.llm_model})")
     _smriti = SMRITI(config=config)
     atexit.register(_smriti.save)
-    logger.info("SMRITI MCP server ready — 12 smriti_* tools + 6 AMP aliases registered")
+    logger.info("SMRITI MCP server ready — 14 smriti_* tools + 6 AMP aliases registered")
 
 
 if __name__ == "__main__":

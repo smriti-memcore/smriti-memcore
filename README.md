@@ -66,12 +66,13 @@ The script will:
 
 **Then restart Claude Code.** Verify with `/mcp` — `smriti` should appear as connected.
 
-**Available tools (19: 13 native + 6 AMP v1.0 aliases):**
+**Available tools (20: 14 native + 6 AMP v1.0 aliases):**
 
 | Tool | Description |
 |---|---|
 | `smriti_encode` | Store information in long-term memory (`private=True` keeps it out of team sync) |
-| `smriti_recall` | Retrieve memories by natural-language query |
+| `smriti_recall` | Retrieve memories by natural-language query; optional `rewrite` and `snippet` enums (`"auto"`/`"llm"`/`"none"`) for query rewriting and content snippet extraction |
+| `smriti_get_memory` | Fetch the full content of a single memory by ID — useful after a snippet recall returns `expandable=true` |
 | `smriti_get_context` | Inject working memory into the current prompt |
 | `smriti_how_well_do_i_know` | Confidence check on a topic |
 | `smriti_knowledge_gaps` | List topics SMRITI knows it doesn't know |
@@ -301,7 +302,7 @@ smriti_palace_to_obsidian --vault ~/path/to/your-vault/Palace
 | Method | Description |
 |---|---|
 | `encode(content, context, source)` | Ingest new information through the Attention Gate |
-| `recall(query, top_k)` | Retrieve relevant memories via graph traversal |
+| `recall(query, top_k, rewrite, snippet)` | Retrieve relevant memories via graph traversal; `rewrite`/`snippet` accept `"auto"`/`"llm"`/`"none"` to opt into query rewriting and snippet extraction |
 | `how_well_do_i_know(topic)` | Meta-memory confidence check |
 | `consolidate(depth)` | Run background consolidation (`"full"`, `"light"`, `"defer"`) |
 | `save()` | Persist all state to disk |
@@ -335,6 +336,16 @@ config = SmritiConfig(
     # Palace graph
     room_merge_threshold=0.85,       # similarity to auto-merge rooms
 
+    # Smart recall (all default off via "auto" mode that no-ops without flags)
+    rewrite_mode_default="auto",     # "auto" | "llm" | "none" — query rewriting
+    snippet_mode_default="auto",     # "auto" | "llm" | "none" — snippet extraction
+    snippet_min_chars=300,           # content ≤ this is returned as-is
+    snippet_max_sentences=2,         # max sentences in a snippet
+    llm_rewrite_cache_size=100,      # LRU cache for LLM rewrites
+    llm_rewrite_prompt_version="v1", # cache-key component for prompt changes
+    adjacency_alpha=0.3,             # per-memory adjacency-lift coefficient
+    adjacency_lift_max=1.0,          # cap on weighted-average adjacency lift
+
     # LLM provider (pick one)
     llm_model="mistral",                     # Ollama (default)
     # llm_model="gpt-4o",                    # OpenAI
@@ -348,6 +359,16 @@ config = SmritiConfig(
 ```
 
 ---
+
+## What's New in v1.4.0
+
+- **Query rewriting** — `smriti_recall(rewrite="auto"|"llm"|"none")` widens recall by generating paraphrase variants. `auto` uses lexical variants; `llm` calls the configured LLM with an LRU cache. Default off.
+- **Snippet extraction** — `smriti_recall(snippet="auto"|"llm"|"none")` returns a short relevant excerpt instead of full content. `auto` uses lexical sentence-match with a cosine-floor fallback for zero-overlap queries; `llm` falls back to `auto` on empty/error response. State-leak guarded. Default off.
+- **Per-memory adjacency lift** — replaces the prior flat 0.85 cross-room discount with a weighted lift driven by `adjacency_alpha` (capped by `adjacency_lift_max`), plus entry-room widening.
+- **New `smriti_get_memory` MCP tool** — fetch full content of a single memory after a snippet recall (`expandable=true` in the snippet response indicates truncation).
+- **`SmritiConfig` smart-recall fields** — `rewrite_mode_default`, `snippet_mode_default`, `snippet_min_chars`, `snippet_max_sentences`, `llm_rewrite_cache_size`, `llm_rewrite_prompt_version`, `adjacency_alpha`, `adjacency_lift_max`.
+- **Bench harness `scripts/bench_recall.py`** — hit-rate@10 + tokens/query + p95 latency, with `--baseline <sha>` for cross-branch ID-order regression check. Smoke run shows ~74.5% token reduction with features enabled.
+- **No breaking changes** — all features default off; existing callers see identical behavior.
 
 ## What's New in v1.3.0
 
@@ -446,7 +467,7 @@ python benchmarks/vector_benchmark.py
 
 ```
 smriti-memcore/
-├── smriti/                 # Core library
+├── smriti_memcore/        # Core library
 │   ├── __init__.py
 │   ├── core.py            # SMRITI orchestrator
 │   ├── models.py          # Data models & SmritiConfig
@@ -455,6 +476,9 @@ smriti-memcore/
 │   ├── working_memory.py  # Capacity-bounded priority queue
 │   ├── attention_gate.py  # Salience filter
 │   ├── retrieval.py       # Multi-factor retrieval engine
+│   ├── query_rewriter.py  # Query paraphrase variants (auto/llm)
+│   ├── snippet.py         # Content snippet extraction (auto/llm)
+│   ├── fts_index.py       # SQLite FTS5 lexical index (hybrid search)
 │   ├── consolidation.py   # Async background processes
 │   ├── meta_memory.py     # Confidence mapping
 │   ├── vector_store.py    # Vector persistence
@@ -462,9 +486,10 @@ smriti-memcore/
 │   ├── metrics.py         # Observability: counters, gauges, histograms, Prometheus export
 │   └── integrations/      # Framework adapters
 │       ├── langchain_memory.py  # LangChain BaseMemory component
-│       └── mcp_server.py        # Claude Code MCP server (19 tools: 13 smriti_* + 6 AMP aliases)
+│       └── mcp_server.py        # Claude Code MCP server (20 tools: 14 smriti_* + 6 AMP aliases)
 ├── install_smriti_mcp.sh   # One-command Claude Code setup
-├── tests/                 # 246 tests across 15 files
+├── scripts/               # Utility scripts (bench_recall.py, etc.)
+├── tests/                 # 298 tests across 18 files
 ├── baselines/             # Baseline implementations for comparison
 ├── benchmarks/            # Benchmark harness & scripts
 ├── examples/              # Usage examples
