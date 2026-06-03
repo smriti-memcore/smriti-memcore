@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-06-02
+
+### Fixed
+- **Installation Script**: Fixed missing `warn` helper function definition which caused installer to crash if Ollama wasn't running.
+- **Installation Script**: Fixed install-time evaluation of `$(pwd)` in SessionStart hook by escaping it to evaluate at runtime.
+- **Installation Script**: Bumped minimum Python version to 3.10+ and improved executable discovery to prevent using incompatible Python 3.9 (as the `mcp` dependency requires 3.10+).
+
 ## [1.3.0] - 2026-05-26
 
 ### Added

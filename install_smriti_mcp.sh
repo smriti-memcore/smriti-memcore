@@ -21,16 +21,17 @@ VENV_DIR="$HOME/.smriti/venv"
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 info()    { echo "[smriti] $*"; }
+warn()    { echo "[smriti] ⚠ $*" >&2; }
 success() { echo "[smriti] ✓ $*"; }
 error()   { echo "[smriti] ✗ $*" >&2; exit 1; }
 
 # ── 1. Create dedicated venv ──────────────────────────────────────────────────
 
-PY=$(command -v python3 || command -v python || true)
-[[ -z "$PY" ]] && error "Python 3.9+ not found. Install it first."
+PY=$(command -v python3.13 || command -v python3.12 || command -v python3.11 || command -v python3.10 || command -v python3 || command -v python || true)
+[[ -z "$PY" ]] && error "Python 3.10+ not found. Install it first."
 
 PY_VERSION=$("$PY" -c "import sys; print(sys.version_info.minor)")
-[[ "$PY_VERSION" -lt 9 ]] && error "Python 3.9+ required (found 3.$PY_VERSION)."
+[[ "$PY_VERSION" -lt 10 ]] && error "Python 3.10+ required (found 3.$PY_VERSION)."
 
 if [[ ! -x "$VENV_DIR/bin/python3" ]]; then
     info "Creating venv at $VENV_DIR..."
@@ -300,7 +301,7 @@ smriti_session_group = {
     "matcher": "",
     "hooks": [{
         "type": "command",
-        "command": r"""bash -c 'echo "{\"systemMessage\": \"SMRITI MEMORY: Session starting in $(pwd). Call smriti_get_context to load working memory for this project, then smriti_recall with the project name and relevant keywords.\"}"'""",
+        "command": r"""bash -c 'echo "{\"systemMessage\": \"SMRITI MEMORY: Session starting in \$(pwd). Call smriti_get_context to load working memory for this project, then smriti_recall with the project name and relevant keywords.\"}"'""",
         "statusMessage": "Loading SMRITI context..."
     }]
 }

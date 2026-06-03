@@ -355,7 +355,9 @@ config = SmritiConfig(
 - **`private=True` on encode** — `smriti_encode` and `amp.encode` now accept `private=True`; Claude uses this when you say *"remember this privately"*
 - **`Visibility` field on memories and rooms** — `"private"` | `"shared"`; default is `"shared"`. Private memories are still recalled by the owner — privacy only controls team sync eligibility
 - **AMP spec updated** — `visibility` field added to `MemoryResult`, `private` param added to `amp.encode`, `visibility` filter added to `amp.recall` filters schema
-- **palace.json schema v2** — automatic migration on first load; all existing memories and rooms default to `"shared"`
+- **palace.json schema v3** — automatic migration; all existing memories and rooms default to `"shared"`, and embeddings are stripped on save to reduce on-disk storage size by ~10x
+- **Encoding discipline guidance** — baked directly into MCP server instructions and tool docstrings to guide consumer LLMs to label hypotheses, cite evidence, and prune stale/wrong memories
+
 
 ## What's New in v1.2.0
 
