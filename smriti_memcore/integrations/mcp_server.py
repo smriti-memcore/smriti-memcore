@@ -103,6 +103,7 @@ def serialize_memory(memory: Memory) -> Dict[str, Any]:
     return {
         "id": memory.id,
         "content": memory.content,
+        "content_compressed": memory.content_compressed,
         "strength": memory.strength,
         "confidence": memory.confidence,
         "room_id": memory.room_id,
@@ -196,6 +197,31 @@ def smriti_get_context() -> Dict[str, str]:
         return {"context": _smriti.get_context()}
     except Exception as e:
         logger.error(f"smriti_get_context failed: {e}")
+        return {"error": str(e)}
+
+
+@mcp_server.tool()
+def smriti_retrieve_original(memory_id: str) -> Dict[str, Any]:
+    """
+    Retrieve the full, uncompressed original text of a memory.
+    
+    Use this when a memory injected into your context has a ⟨compressed:id⟩ marker
+    and you need the exact details (e.g. full JSON payload, original code bodies).
+    """
+    try:
+        mem = _smriti.palace.memories.get(memory_id)
+        if not mem:
+            return {"error": f"Memory {memory_id} not found."}
+        
+        # Track retrieval
+        _smriti._metrics.original_retrieval_count.inc()
+        
+        return {
+            "id": mem.id,
+            "content_original": mem.content,
+        }
+    except Exception as e:
+        logger.error(f"smriti_retrieve_original failed: {e}")
         return {"error": str(e)}
 
 

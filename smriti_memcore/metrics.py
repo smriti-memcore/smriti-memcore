@@ -117,6 +117,8 @@ class SmritiMetrics:
         self.recall_empty = _Counter()
         self.consolidation_count = _Counter()
         self.consolidation_errors = _Counter()
+        self.compression_count = _Counter()
+        self.original_retrieval_count = _Counter()
         self.llm_call_count = _Counter()
         self.llm_errors = _Counter()
 
@@ -124,6 +126,7 @@ class SmritiMetrics:
         self.encode_latency = _Histogram()      # ms
         self.recall_latency = _Histogram()       # ms
         self.consolidation_latency = _Histogram()  # seconds
+        self.compression_ratio = _Histogram()    # compressed/original ratio
         self.llm_latency = _Histogram()          # ms
 
         # ── Gauges (current state) ──
@@ -159,6 +162,11 @@ class SmritiMetrics:
                     "total": self.consolidation_count.value,
                     "errors": self.consolidation_errors.value,
                     "latency_s": self.consolidation_latency.snapshot(),
+                },
+                "compression": {
+                    "total_attempts": self.compression_count.value,
+                    "original_retrievals": self.original_retrieval_count.value,
+                    "ratio": self.compression_ratio.snapshot(),
                 },
                 "llm": {
                     "total_calls": self.llm_call_count.value,
@@ -210,6 +218,10 @@ class SmritiMetrics:
         _counter("smriti_consolidation_total", "Total consolidations", self.consolidation_count.value)
         _counter("smriti_consolidation_errors_total", "Failed consolidation processes", self.consolidation_errors.value)
         _hist("smriti_consolidation_latency_seconds", "Consolidation duration", self.consolidation_latency)
+
+        _counter("smriti_compression_total", "Total compression attempts", self.compression_count.value)
+        _counter("smriti_original_retrieval_total", "Requests for uncompressed originals", self.original_retrieval_count.value)
+        _hist("smriti_compression_ratio", "Ratio of compressed to original length", self.compression_ratio)
 
         _counter("smriti_llm_calls_total", "Total LLM calls", self.llm_call_count.value)
         _counter("smriti_llm_errors_total", "Failed LLM calls", self.llm_errors.value)

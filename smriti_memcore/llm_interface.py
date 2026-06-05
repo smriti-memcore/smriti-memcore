@@ -251,6 +251,7 @@ Return JSON: {{"summary": "concise combined summary", "key_facts": ["fact1", "fa
             "options": {
                 "temperature": temperature,
                 "num_predict": max_tokens,
+                "num_ctx": 32768,
             },
         }
         if system:
@@ -260,7 +261,7 @@ Return JSON: {{"summary": "concise combined summary", "key_facts": ["fact1", "fa
             resp = requests.post(
                 f"{self.ollama_url}/api/generate",
                 json=payload,
-                timeout=120,
+                timeout=1200,
             )
             resp.raise_for_status()
             data = resp.json()
@@ -305,7 +306,7 @@ Return JSON: {{"summary": "concise combined summary", "key_facts": ["fact1", "fa
                     "temperature": temperature,
                     "max_tokens": max_tokens,
                 },
-                timeout=60,
+                timeout=600,
             )
             resp.raise_for_status()
             data = resp.json()
@@ -347,7 +348,7 @@ Return JSON: {{"summary": "concise combined summary", "key_facts": ["fact1", "fa
                         "maxOutputTokens": max_tokens,
                     },
                 },
-                timeout=60,
+                timeout=600,
             )
             resp.raise_for_status()
             data = resp.json()
@@ -395,7 +396,7 @@ Return JSON: {{"summary": "concise combined summary", "key_facts": ["fact1", "fa
                 "https://api.anthropic.com/v1/messages",
                 headers=headers,
                 json=payload,
-                timeout=90,
+                timeout=600,
             )
             resp.raise_for_status()
             data = resp.json()

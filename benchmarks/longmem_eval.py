@@ -5,10 +5,14 @@ import argparse
 import tempfile
 import shutil
 from typing import Dict, Any, List
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # LCEL and LangChain imports
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.messages import HumanMessage, AIMessage
@@ -23,14 +27,18 @@ DEFAULT_MODELS = {
     "ollama": "mistral",
     "openai": "gpt-4o-mini",
     "anthropic": "claude-haiku-4-5-20251001",
+    "gemini": "gemini-2.5-flash",
 }
 
 
 def make_llm(provider: str, model: str):
     if provider == "ollama":
-        return ChatOpenAI(base_url=OLLAMA_BASE_URL, api_key="ollama", model=model, temperature=0.0)
+        return ChatOpenAI(base_url=OLLAMA_BASE_URL, api_key="ollama", model=model, temperature=0.0, timeout=1200)
     if provider == "anthropic":
         return ChatAnthropic(model=model, temperature=0.0)
+    if provider == "gemini":
+        gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        return ChatGoogleGenerativeAI(model=model, temperature=0.0, google_api_key=gemini_key)
     return ChatOpenAI(model=model, temperature=0.0)
 
 # Simple exact/fuzzy match for evaluation
@@ -224,12 +232,12 @@ def main():
     parser.add_argument("--baseline", action="store_true", help="Run with standard ConversationBufferMemory instead of SMRITI")
     parser.add_argument("--mode", choices=["hybrid", "vector"], default="hybrid",
                         help="Retrieval mode for SMRITI: hybrid (FTS+RRF, default) or vector-only")
-    parser.add_argument("--llm", choices=["ollama", "openai", "anthropic"], default="ollama",
+    parser.add_argument("--llm", choices=["ollama", "openai", "anthropic", "gemini"], default="ollama",
                         help="LLM provider for QA chain (default: ollama)")
     parser.add_argument("--llm-model", dest="llm_model", default=None,
-                        help="Model name for QA chain (defaults: mistral / gpt-4o-mini / claude-haiku-4-5-20251001)")
+                        help="Model name for QA chain")
     parser.add_argument("--smriti-model", dest="smriti_model", default="mistral",
-                        help="Ollama/LLM model for SMRITI consolidation calls (default: mistral)")
+                        help="LLM model for SMRITI consolidation calls (e.g. gemini-2.5-flash, mistral)")
     parser.add_argument("--output", type=str, default="results/longmemeval_results.json",
                         help="Path to write JSON results (default: results/longmemeval_results.json)")
     args = parser.parse_args()

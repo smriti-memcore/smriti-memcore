@@ -110,6 +110,7 @@ class Memory:
     """A single memory unit — the fundamental atom of the SMRITI system."""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     content: str = ""
+    content_compressed: Optional[str] = None  # Compressed version for LLM injection (CCR)
     embedding: Optional[List[float]] = None
     modality: Modality = Modality.TEXT
     source: MemorySource = MemorySource.DIRECT
@@ -162,7 +163,7 @@ class Memory:
             self.status = MemoryStatus.DECAYING
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "id": self.id,
             "content": self.content,
             # "embedding" intentionally omitted — persisted in vectors.npy only (palace.json schema v3+)
@@ -187,6 +188,11 @@ class Memory:
             # Visibility
             "visibility": self.visibility.value,
         }
+        # Only persist content_compressed if set (schema v4+) to keep
+        # backward-compatible palace.json files clean.
+        if self.content_compressed is not None:
+            d["content_compressed"] = self.content_compressed
+        return d
 
 
 @dataclass

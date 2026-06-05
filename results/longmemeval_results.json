@@ -1,50 +1,410 @@
 {
   "summary": {
-    "method": "SMRITI",
-    "total_cases": 5,
-    "accuracy": 0.8,
-    "latency": 0.9806971549987793
+    "method": "SMRITI hybrid (FTS+RRF) [ollama/mistral]",
+    "total_cases": 50,
+    "accuracy": 0.64,
+    "latency": 16.046918087005615
   },
   "cases": [
     {
       "question_id": "e47becba",
       "question_type": "single-session-user",
       "accuracy": 1.0,
-      "latency": 1.0217769145965576,
-      "prediction": "You graduated with a degree in Business Administration.",
+      "latency": 5.922276020050049,
+      "prediction": " You graduated with a degree in Business Administration.",
       "ground_truth": "Business Administration"
     },
     {
       "question_id": "118b2229",
       "question_type": "single-session-user",
-      "accuracy": 1.0,
-      "latency": 0.9979660511016846,
-      "prediction": "Your daily commute to work takes 45 minutes each way.",
+      "accuracy": 0.0,
+      "latency": 14.702455759048462,
+      "prediction": " Based on the provided context, there isn't any information about the duration of the human's daily commute to work in Melbourne. However, it was mentioned that another individual has a 45-minute each way commute, which could be used for listening to audiobooks.",
       "ground_truth": "45 minutes each way"
     },
     {
       "question_id": "51a45a95",
       "question_type": "single-session-user",
       "accuracy": 0.0,
-      "latency": 1.3549840450286865,
-      "prediction": "You redeemed a $5 coupon on coffee creamer at a store, but the specific store is not mentioned in the context.",
+      "latency": 14.311939001083374,
+      "prediction": " The context does not provide information about where the $5 coupon on coffee creamer was redeemed.",
       "ground_truth": "Target"
     },
     {
       "question_id": "58bf7951",
       "question_type": "single-session-user",
       "accuracy": 1.0,
-      "latency": 0.8715379238128662,
-      "prediction": "You attended a production of The Glass Menagerie at the local community theater.",
+      "latency": 9.52035403251648,
+      "prediction": " The play you attended at the local community theater was \"The Glass Menagerie.\"",
       "ground_truth": "The Glass Menagerie"
     },
     {
       "question_id": "1e043500",
       "question_type": "single-session-user",
       "accuracy": 1.0,
-      "latency": 0.6572208404541016,
-      "prediction": "The name of the playlist you created on Spotify is \"Summer Vibes.\"",
+      "latency": 12.890046834945679,
+      "prediction": " The name of the playlist you created on Spotify is \"Summer Vibes.\"",
       "ground_truth": "Summer Vibes"
+    },
+    {
+      "question_id": "c5e8278d",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 18.007893800735474,
+      "prediction": " Based on the context provided, your last name before changing it was Johnson.",
+      "ground_truth": "Johnson"
+    },
+    {
+      "question_id": "6ade9755",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 21.85071110725403,
+      "prediction": " Based on the context provided, these are some yoga apps that can help with a home practice: Down Dog, YogaGlo, Peloton Digital, Yoga Studio, Asana Rebel, Pocket Yoga, Alo Moves, Calm, Dylan Werner Yoga, and Yoga With Adriene. These apps offer various styles of yoga such as vinyasa flow, hatha, and restorative yoga. To find healthy brunch spots near Serenity Yoga, you can use Google Search, online review sites like Yelp or TripAdvisor, ask your yoga community for recommendations, or check social media platforms like Instagram or Facebook.",
+      "ground_truth": "Serenity Yoga"
+    },
+    {
+      "question_id": "6f9b354f",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 14.159095764160156,
+      "prediction": " The Facebook post suggests repainting the bedroom walls with a color that complements the minimalist aesthetic and natural wood accents of your home office. However, no specific color was mentioned in the context provided.",
+      "ground_truth": "a lighter shade of gray"
+    },
+    {
+      "question_id": "58ef2f1c",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 12.034761190414429,
+      "prediction": " The human volunteered at a local animal shelter's fundraising dinner on Valentine's Day, as mentioned in the context provided.",
+      "ground_truth": "February 14th"
+    },
+    {
+      "question_id": "f8c5f88b",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 14.908880949020386,
+      "prediction": " Based on the provided context, it is not specified where the human bought their new tennis racket from.",
+      "ground_truth": "the sports store downtown"
+    },
+    {
+      "question_id": "5d3d2817",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 11.355348825454712,
+      "prediction": " Based on the provided context, there is no information about the previous occupation of the human in question (Amy). The conversations revolve around her current role as an LPC Associate and discussions about potential job opportunities at Televero Health for psychiatrists and Licensed Clinical Social Workers.",
+      "ground_truth": "Marketing specialist at a small startup"
+    },
+    {
+      "question_id": "7527f7e2",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 6.597501754760742,
+      "prediction": " You spent $800 on a designer handbag.",
+      "ground_truth": "$800"
+    },
+    {
+      "question_id": "c960da58",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 20.811293125152588,
+      "prediction": " You currently have 20 playlists on Spotify.",
+      "ground_truth": "20"
+    },
+    {
+      "question_id": "3b6f954b",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 4.260214567184448,
+      "prediction": " You attended the University of Melbourne for your study abroad program.",
+      "ground_truth": "University of Melbourne in Australia"
+    },
+    {
+      "question_id": "726462e0",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 18.067420959472656,
+      "prediction": " Based on the provided context, there is no information about a discount on a first purchase from any of the mentioned clothing brands.",
+      "ground_truth": "10%"
+    },
+    {
+      "question_id": "94f70d80",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 10.611779928207397,
+      "prediction": " The IKEA bookshelf took 4 hours to assemble.",
+      "ground_truth": "4 hours"
+    },
+    {
+      "question_id": "66f24dbb",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 8.974393844604492,
+      "prediction": " The gift for your sister's birthday was a yellow dress and a pair of earrings that match the dress.",
+      "ground_truth": "a yellow dress"
+    },
+    {
+      "question_id": "ad7109d1",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 7.055459022521973,
+      "prediction": " Your new internet plan is 500 Mbps.",
+      "ground_truth": "500 Mbps"
+    },
+    {
+      "question_id": "af8d2e46",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 17.359158039093018,
+      "prediction": " The context does not provide the exact number of shirts packed for the 5-day trip to Costa Rica. However, it is mentioned that only 3 out of 7 shirts were worn during the trip, suggesting that more than 3 shirts were initially packed.",
+      "ground_truth": "7"
+    },
+    {
+      "question_id": "dccbc061",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 10.879632711410522,
+      "prediction": " Based on the provided context, your previous stance on spirituality was that of a staunch atheist. However, you have recently been exploring other possibilities and are currently interested in finding books on synchronicity and its connection to spirituality. You've also shown interest in learning more about Buddhism. In terms of differentiating between truth and belief, it seems like you're questioning the process, but further discussion on that topic is not explicitly mentioned in the context provided.",
+      "ground_truth": "A staunch atheist"
+    },
+    {
+      "question_id": "c8c3f81d",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 11.11914587020874,
+      "prediction": " Based on the provided context, your favorite running shoe brand is Nike.",
+      "ground_truth": "Nike"
+    },
+    {
+      "question_id": "8ebdbe50",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 9.226818084716797,
+      "prediction": " The human completed a Data Science certification last month.",
+      "ground_truth": "Data Science"
+    },
+    {
+      "question_id": "6b168ec8",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 20.283602952957153,
+      "prediction": " You own three bikes: a road bike, a mountain bike, and a commuter bike.",
+      "ground_truth": "three"
+    },
+    {
+      "question_id": "75499fd8",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 17.06299901008606,
+      "prediction": " Based on the provided context, it is not specified what breed your dog is. The conversation revolves around finding a new collar and name tag for Max, who is a Golden Retriever.",
+      "ground_truth": "Golden Retriever"
+    },
+    {
+      "question_id": "21436231",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 21.77555775642395,
+      "prediction": " You caught 12 largemouth bass on your fishing trip to Lake Michigan.",
+      "ground_truth": "12"
+    },
+    {
+      "question_id": "95bcc1c8",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 8.326292991638184,
+      "prediction": " The human watched 10 amateur comedians perform at the open mic night.",
+      "ground_truth": "10"
+    },
+    {
+      "question_id": "0862e8bf",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 8.19466495513916,
+      "prediction": " The name of your cat is Luna.",
+      "ground_truth": "Luna"
+    },
+    {
+      "question_id": "853b0a1d",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 15.575064182281494,
+      "prediction": " Based on the provided context, you were 18 years old when your grandma gave you the silver necklace.",
+      "ground_truth": "18"
+    },
+    {
+      "question_id": "a06e4cfe",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 17.11131715774536,
+      "prediction": " The provided memory context indicates that the human has settled on a 3:1 ratio of gin to vermouth with a dash of citrus bitters for their classic gin martini.",
+      "ground_truth": "3:1"
+    },
+    {
+      "question_id": "37d43f65",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 30.219876289367676,
+      "prediction": " The user upgraded their laptop's RAM to 16GB.",
+      "ground_truth": "16GB"
+    },
+    {
+      "question_id": "b86304ba",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 21.09390115737915,
+      "prediction": " Based on the context provided, the painting of a sunset was purchased from a flea market at an undisclosed price. To determine its value, we would need to consider the factors mentioned earlier: artist's reputation and provenance, rarity and uniqueness, condition and state of preservation, materials and craftsmanship, market demand, size and scale, signature, provenance, and documentation, exhibition history and critical acclaim, authentication and certification, and comparative sales.\n\nSince we don't have information about the artist, the specific materials used, its condition, provenance, or any other relevant details, it is impossible to accurately estimate the painting's value based on the provided context. However, given that it was tripled in value after being purchased, it seems to be a piece worth considering getting appraised by a professional for a more accurate estimate.",
+      "ground_truth": "The painting is worth triple what I paid for it."
+    },
+    {
+      "question_id": "d52b4f67",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 15.846776962280273,
+      "prediction": " The context does not provide information about where the AI attended the cousin's wedding.",
+      "ground_truth": "The Grand Ballroom"
+    },
+    {
+      "question_id": "25e5aa4f",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 20.282278060913086,
+      "prediction": " You completed your Bachelor's degree in Computer Science at UCLA (University of California, Los Angeles). The Coursera - Data Science Specialization is a comprehensive online course that covers various aspects of data science. It includes six courses and two capstone projects, covering topics such as Python programming, statistical analysis, machine learning, and data visualization. By completing this specialization, you can expect to gain skills in data manipulation, data analysis, predictive modeling, and data visualization using tools like Python, SQL, R, and Tableau.",
+      "ground_truth": "University of California, Los Angeles (UCLA)"
+    },
+    {
+      "question_id": "caf9ead2",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 7.2842371463775635,
+      "prediction": " I'm sorry, but I don't have information about any additional benefits of living in the new apartment aside from the shorter commute. Regarding the time it took to move, according to the context provided, it took around 5 hours.",
+      "ground_truth": "5 hours"
+    },
+    {
+      "question_id": "8550ddae",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 21.689110040664673,
+      "prediction": " Based on the provided context, there is no information about what type of cocktail recipe was tried last weekend in the memories provided.",
+      "ground_truth": "lavender gin fizz"
+    },
+    {
+      "question_id": "60d45044",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 25.04949188232422,
+      "prediction": " Based on the provided context, it's not specified what type of rice is your favorite. However, in the context of Japanese-style dishes, it seems that short-grain rice is preferred for its stickiness and clinginess, which makes it ideal for shaping onigiri and other Japanese dishes.",
+      "ground_truth": "Japanese short-grain rice"
+    },
+    {
+      "question_id": "3f1e9474",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 12.437376976013184,
+      "prediction": " The conversation about destiny was with the AI assistant.",
+      "ground_truth": "Sarah"
+    },
+    {
+      "question_id": "86b68151",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 8.401519298553467,
+      "prediction": " The human bought their new bookshelf from IKEA.",
+      "ground_truth": "IKEA"
+    },
+    {
+      "question_id": "577d4d32",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 30.88036823272705,
+      "prediction": " Based on the provided context, it was mentioned that the human has been trying to establish a better evening routine by stopping work emails and messages by 7 pm. However, no specific method for tracking progress or staying motivated in this regard was discussed. The conversation focused more on improving sleep quality and establishing a consistent sleep schedule. If you'd like to discuss methods for sticking to the 7 pm cut-off for work emails and messages, I can provide suggestions based on similar principles such as habit tracking, setting reminders, or sharing goals with someone else.",
+      "ground_truth": "7 pm"
+    },
+    {
+      "question_id": "ec81a493",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 21.5987491607666,
+      "prediction": " Based on the provided context, it is not specified how many copies of your favorite artist's debut album were released worldwide. However, you mentioned that it was a limited edition of only 500 copies.",
+      "ground_truth": "500"
+    },
+    {
+      "question_id": "15745da0",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 29.099050998687744,
+      "prediction": " Based on the provided context, it's not explicitly stated how long the person has been collecting vintage cameras. However, there are two instances where they asked for advice on organizing and maintaining their collection, which suggests they have been collecting for some time but less than three months as mentioned in one of the responses.",
+      "ground_truth": "three months"
+    },
+    {
+      "question_id": "e01b8e2f",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 25.29606008529663,
+      "prediction": " Based on the context, you went on a week-long trip to Hawaii's Big Island with your family approximately one month before the mountain getaway with friends (which was about 3 months ago). So, if we count backwards from June 2nd, 2023 (the start of Trip #2), that would place the family trip in late April or early May. However, without more specific details, I can't pinpoint the exact month.\n\nAs for adding highlights to the events, you mentioned that the view from the top of the challenging trail during Trip #1 was amazing. For the family trip to Hawaii, you loved it so much when you went last month! You didn't specify any particular activities or sights, but I assume there were many memorable moments during your week-long stay.\n\nRegarding additional trips, you haven't mentioned any yet. If you have more information about other trips you'd like to add to the timeline, feel free to share!",
+      "ground_truth": "Hawaii"
+    },
+    {
+      "question_id": "bc8a6e93",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 24.05152201652527,
+      "prediction": " Based on the provided context, there is no information about what you baked for your niece's birthday party.",
+      "ground_truth": "a lemon blueberry cake"
+    },
+    {
+      "question_id": "ccb36322",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 18.895660161972046,
+      "prediction": " The user has been using Netflix for watching content, not Spotify for music.",
+      "ground_truth": "Spotify"
+    },
+    {
+      "question_id": "001be529",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 10.241032123565674,
+      "prediction": " Based on the provided context, it's not specified how long the Human waited for the decision on their asylum application.",
+      "ground_truth": "over a year"
+    },
+    {
+      "question_id": "b320f3f8",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 26.237676858901978,
+      "prediction": " The action figure you bought from the thrift store was a rare blue Snaggletooth.",
+      "ground_truth": "a blue Snaggletooth"
+    },
+    {
+      "question_id": "19b5f2b3",
+      "question_type": "single-session-user",
+      "accuracy": 0.0,
+      "latency": 15.804541826248169,
+      "prediction": " Based on the provided context, it is not specified how long the human was in Japan for during their previous visit.",
+      "ground_truth": "two weeks"
+    },
+    {
+      "question_id": "4fd1909e",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 9.716155052185059,
+      "prediction": " The Imagine Dragons concert was held at Xfinity Center.",
+      "ground_truth": "Xfinity Center"
+    },
+    {
+      "question_id": "545bd2b5",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 21.585216999053955,
+      "prediction": " Based on the provided context, the human has been averaging around 2 hours of screen time on Instagram per day for the past two weeks. Using website blockers or app blockers could help them stay focused and reduce their screen time, especially when it comes to messaging apps like WhatsApp.",
+      "ground_truth": "2 hours"
+    },
+    {
+      "question_id": "8a137a7f",
+      "question_type": "single-session-user",
+      "accuracy": 1.0,
+      "latency": 23.67922282218933,
+      "prediction": " The human replaced a Philips LED bulb in their bedside lamp. Regarding the question about investing in a smart lighting system, it depends on personal preferences and needs. If you're interested in controlling your lights remotely, setting schedules, or creating scenes, then a smart lighting system might be worth considering. However, if you just want to start with some smart bulbs for convenience and basic control, that's also an option. You can begin by purchasing a few Philips Hue White bulbs or other compatible smart bulbs and experimenting with them before deciding to invest in a more extensive system.",
+      "ground_truth": "Philips LED bulb"
     }
   ]
 }

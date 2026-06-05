@@ -136,21 +136,30 @@ class WorkingMemory:
         """Format working memory contents for LLM context injection."""
         lines = []
 
+        def _format_mem(mem: Memory) -> str:
+            if mem.content_compressed:
+                return (
+                    f"• {mem.content_compressed}\n"
+                    f"  ⟨compressed:{mem.id}⟩ — call smriti_retrieve_original('{mem.id}') for full text"
+                )
+            return f"• {mem.content}"
+
         active = self.get_active_context()
         if active:
             lines.append("=== Active Context ===")
             for mem in active:
-                lines.append(f"• {mem.content}")
+                lines.append(_format_mem(mem))
 
         peripheral = self.get_peripheral_context()
         if peripheral:
             lines.append("\n=== Background Context ===")
             for mem in peripheral:
-                lines.append(f"• {mem.content}")
+                lines.append(_format_mem(mem))
 
         if self._suggestions:
             lines.append("\n=== Suggestions ===")
             for mem in self._suggestions:
+                # Suggestion previews don't show compression markers, just the first 100 chars
                 lines.append(f"💡 Relevant: {mem.content[:100]}")
 
         if self._warnings:

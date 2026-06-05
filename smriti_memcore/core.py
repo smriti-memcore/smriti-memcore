@@ -26,6 +26,7 @@ from smriti_memcore.consolidation import ConsolidationEngine
 from smriti_memcore.meta_memory import MetaMemory
 from smriti_memcore.metrics import SmritiMetrics
 from smriti_memcore.fts_index import FTSIndex
+from smriti_memcore.compressors import ContentRouter
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +118,9 @@ class SMRITI:
 
         self.meta_memory = MetaMemory(palace=self.palace)
 
+        # Content compressor (CCR — Content Compress & Retrieve)
+        self.content_router = ContentRouter()
+
         # Register cleanup on unexpected exit
         atexit.register(self._atexit_save)
         self._closed = False
@@ -169,6 +173,21 @@ class SMRITI:
             embedding=episode.embedding,
             confidence=1.0 if source == MemorySource.USER_STATED else 0.8,
         )
+
+        # 3b. Compress content for efficient LLM injection (CCR)
+        try:
+            compression = self.content_router.compress(content, modality)
+            if compression.compressed is not None:
+                memory.content_compressed = compression.compressed
+                self._metrics.compression_count.inc()
+                self._metrics.compression_ratio.observe(compression.ratio)
+                logger.debug(
+                    f"Compressed ({compression.compressor_used}): "
+                    f"{compression.original_length} → {compression.compressed_length} chars "
+                    f"({compression.ratio:.1%})"
+                )
+        except Exception as e:
+            logger.warning(f"Content compression failed, storing uncompressed: {e}")
 
         room = self.palace.place_memory(memory)
 

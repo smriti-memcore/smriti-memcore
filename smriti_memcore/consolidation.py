@@ -234,7 +234,7 @@ class ConsolidationEngine:
 
         return {"chunks_created": chunks_created, "episodes_processed": len(episodes)}
 
-    def _group_similar_episodes(self, episodes, threshold: float = 0.6):
+    def _group_similar_episodes(self, episodes, threshold: float = 0.6, max_group_size: int = 5):
         """Group episodes by semantic similarity."""
         if not episodes:
             return []
@@ -263,6 +263,8 @@ class ConsolidationEngine:
             assigned[i] = True
 
             for j in range(i + 1, len(episodes)):
+                if len(group) >= max_group_size:
+                    break
                 if assigned[j]:
                     continue
 

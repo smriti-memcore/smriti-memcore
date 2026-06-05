@@ -48,7 +48,7 @@ class TestVisibilityModel:
 
 class TestSchemaMigration:
     def test_schema_version_is_current(self):
-        assert PALACE_SCHEMA_VERSION == 3
+        assert PALACE_SCHEMA_VERSION == 4
 
     def test_v0_migration_sets_visibility_shared(self):
         state = {

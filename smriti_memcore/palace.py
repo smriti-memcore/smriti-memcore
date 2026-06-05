@@ -22,7 +22,7 @@ from smriti_memcore.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 
-PALACE_SCHEMA_VERSION = 3
+PALACE_SCHEMA_VERSION = 4
 
 
 @dataclass
@@ -412,6 +412,10 @@ class SemanticPalace:
             logger.info("Migrating palace from schema v2 → v3 (stripping inline embeddings)")
             for m in state.get("memories", {}).values():
                 m.pop("embedding", None)
+        if version < 4:
+            # v3→v4: content_compressed field added to Memory.
+            # No migration needed — field defaults to None (absent key).
+            logger.info("Migrating palace from schema v3 → v4 (CCR content_compressed support)")
         state["schema_version"] = PALACE_SCHEMA_VERSION
         return state
 
@@ -512,6 +516,8 @@ class SemanticPalace:
                     superseded_by=mdata.get("superseded_by"),
                     # Visibility
                     visibility=Visibility(mdata.get("visibility", "shared")),
+                    # CCR: compressed content for LLM injection (schema v4+)
+                    content_compressed=mdata.get("content_compressed"),
                 )
                 self.memories[mid] = memory
 
