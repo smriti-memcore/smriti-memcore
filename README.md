@@ -47,7 +47,39 @@ SMRITI combines a capacity-bounded Working Memory, a graph-based Semantic Palace
 - **System 2 (Slow & Analytical):** Background consolidation. Uses LLM reasoning to chunk, organize, and abstract semantic knowledge asynchronously while the agent is idle.
 ---
 
-## Quick Start — Claude Code (MCP)
+## Agent Integrations
+
+SMRITI can be used natively inside standard agent frameworks via MCP (Model Context Protocol) or native python integrations.
+
+### Antigravity IDE & Gemini (MCP)
+
+SMRITI integrates seamlessly with Antigravity IDE and Gemini, providing persistent memory across all your agent sessions.
+
+1. Add the following to your `~/.gemini/antigravity-ide/mcp_config.json` (or via the Antigravity UI):
+
+```json
+{
+  "mcpServers": {
+    "smriti-memory": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "smriti-memcore[mcp]",
+        "python",
+        "-m",
+        "smriti_memcore.integrations.mcp_server"
+      ],
+      "env": {
+        "SMRITI_LLM_MODEL": "mistral"
+      }
+    }
+  }
+}
+```
+
+2. To teach Gemini the best practices for using your memory, install the provided Antigravity plugin by copying the `smriti-antigravity-plugin` folder to your `~/.gemini/config/plugins/` directory.
+
+### Claude Code (MCP)
 
 The fastest way to use SMRITI is as a persistent memory layer for [Claude Code](https://claude.ai/code). One command, and your AI remembers you across every session.
 
@@ -105,6 +137,32 @@ The script will:
 | `claude-*` | Anthropic | `SMRITI_LLM_API_KEY` |
 | `gpt-*` | OpenAI | `SMRITI_LLM_API_KEY` |
 | `gemini*` | Google | `SMRITI_LLM_API_KEY` |
+
+### LangChain
+
+Use `SmritiLangChainMemory` to replace `ConversationBufferMemory`. This gives your agent the cost-savings of a capacity-bounded Working Memory while asynchronously archiving the conversation into the Semantic Palace.
+
+```python
+from langchain.chains import ConversationChain
+from smriti.integrations.langchain_memory import SmritiLangChainMemory
+from smriti import SMRITI
+
+# 1. Initialize SMRITI
+smriti_engine = SMRITI(storage_path="./langchain_smriti_db")
+
+# 2. Wrap it for LangChain
+smriti_memory = SmritiLangChainMemory(smriti_client=smriti_engine, top_k=3)
+
+# 3. Plug it into standard chains
+conversation = ConversationChain(
+    llm=my_llm,
+    memory=smriti_memory,
+)
+
+conversation.predict(input="I prefer using PyTorch.")
+```
+
+See [`examples/langchain_agent.py`](examples/langchain_agent.py) or [`examples/quickstart.py`](examples/quickstart.py) for complete working code.
 
 ---
 
@@ -209,37 +267,7 @@ memory.consolidate()
 memory.save()
 ```
 
-### Framework Integrations
-SMRITI can be used natively inside standard agent frameworks. 
 
-#### LangChain
-Use `SmritiLangChainMemory` to replace `ConversationBufferMemory`. This gives your agent the cost-savings of a capacity-bounded Working Memory while asynchronously archiving the conversation into the Semantic Palace.
-
-```python
-from langchain.chains import ConversationChain
-from smriti.integrations.langchain_memory import SmritiLangChainMemory
-from smriti import SMRITI
-
-# 1. Initialize SMRITI
-smriti_engine = SMRITI(storage_path="./langchain_smriti_db")
-
-# 2. Wrap it for LangChain
-smriti_memory = SmritiLangChainMemory(smriti_client=smriti_engine, top_k=3)
-
-# 3. Plug it into standard chains
-conversation = ConversationChain(
-    llm=my_llm,
-    memory=smriti_memory,
-)
-
-conversation.predict(input="I prefer using PyTorch.")
-```
-
-See [`examples/langchain_agent.py`](examples/langchain_agent.py) or [`examples/quickstart.py`](examples/quickstart.py) for complete working code.
-
-#### Claude Code (MCP Server)
-
-See [Quick Start — Claude Code (MCP)](#quick-start--claude-code-mcp) above for one-command setup.
 
 ### Memory Browser UI
 
