@@ -328,13 +328,14 @@ class SmritiConfig:
     embedding_dim: int = 384
 
     # Storage
-    storage_path: str = "./smriti_data"
+    storage_path: str = "~/.smriti/global"
 
     # Safety
     max_content_length: int = 50_000        # Max chars per memory content
 
     def __post_init__(self):
         import os
+        self.storage_path = os.path.expanduser(self.storage_path)
 
         # Resolve API keys from environment if not explicitly set
         if self.openai_api_key is None:
