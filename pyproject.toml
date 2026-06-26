@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smriti-memcore"
-version = "1.4.1"
+version = "1.4.2"
 description = "A neuro-inspired memory architecture for AI agents — combines a Semantic Palace graph, capacity-bounded Working Memory, and asynchronous consolidation."
 readme = "README.md"
 license = {text = "MIT"}
@@ -55,6 +55,7 @@ mcp = [
 [project.scripts]
 smriti_ui = "smriti_memcore.ui.__main__:main"
 smriti_palace_to_obsidian = "smriti_memcore.palace_to_obsidian:main"
+smriti_install = "smriti_memcore.integrations.install:main"
 
 [project.urls]
 Homepage = "https://github.com/shivamtyagi18/smriti-memcore"
