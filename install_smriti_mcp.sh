@@ -229,6 +229,94 @@ PYEOF
     fi
 fi
 
+# ── 5b. Patch Gemini (Antigravity) and Codex (Antigravity-IDE) configs ───────
+
+GEMINI_DIR="$HOME/.gemini"
+if [[ -d "$GEMINI_DIR" ]]; then
+    echo ""
+    read -rp "Gemini & Codex configs detected — register smriti-memory there? [Y/n]: " CONFIGURE_GEMINI_CODEX
+    CONFIGURE_GEMINI_CODEX="${CONFIGURE_GEMINI_CODEX:-Y}"
+
+    if [[ "$CONFIGURE_GEMINI_CODEX" =~ ^[Yy]$ ]]; then
+        info "Registering smriti-memory MCP server in Gemini & Codex configs..."
+
+        ABS_STORAGE_PATH="${STORAGE_PATH/#\~/$HOME}"
+        ABS_OBSIDIAN_PATH="${OBSIDIAN_PATH/#\~/$HOME}"
+
+        "$PYTHON" - <<PYEOF
+import json, os
+
+def patch_config(filepath):
+    filepath = os.path.expanduser(filepath)
+    if os.path.islink(filepath):
+        filepath = os.path.realpath(filepath)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    if os.path.exists(filepath):
+        try:
+            with open(filepath) as f:
+                config = json.load(f)
+        except Exception:
+            config = {}
+    else:
+        config = {}
+        
+    if "mcpServers" not in config:
+        config["mcpServers"] = {}
+        
+    env = {
+        "PYTHONPATH": "",
+        "SMRITI_STORAGE_PATH": "$ABS_STORAGE_PATH",
+        "SMRITI_LLM_MODEL": "$LLM_MODEL",
+        "SMRITI_LLM_API_KEY": "$LLM_API_KEY",
+    }
+    obsidian_path = "$ABS_OBSIDIAN_PATH".strip()
+    if obsidian_path:
+        env["SMRITI_OBSIDIAN_PATH"] = obsidian_path
+        
+    config["mcpServers"]["smriti-memory"] = {
+        "command": "$PYTHON",
+        "args": ["-m", "smriti_memcore.integrations.mcp_server"],
+        "env": env,
+    }
+    with open(filepath, "w") as f:
+        json.dump(config, f, indent=2)
+    print(f"[smriti] ✓ Written to {filepath}")
+
+# Register with Gemini (Antigravity) configs
+patch_config("~/.gemini/config/mcp_config.json")
+patch_config("~/.gemini/antigravity/mcp_config.json")
+
+# Register with Codex (Antigravity-IDE) config
+patch_config("~/.gemini/antigravity-ide/mcp_config.json")
+PYEOF
+
+        # Append global agent rules for Gemini/Codex
+        AGENTS_MD="$GEMINI_DIR/config/AGENTS.md"
+        RULE_HEADER="## Smriti Memory System Hooks"
+        if [[ -d "$GEMINI_DIR/config" ]]; then
+            if [[ ! -f "$AGENTS_MD" ]]; then
+                echo "# Global Customizations" > "$AGENTS_MD"
+            fi
+            
+            if ! grep -q "$RULE_HEADER" "$AGENTS_MD" 2>/dev/null; then
+                cat << 'RULEEOF' >> "$AGENTS_MD"
+
+## Smriti Memory System Hooks
+1. **Automatic Memory Encoding**:
+   - Automatically invoke `smriti_encode` (or `amp.encode`) whenever a significant project milestone is achieved, a key technical decision is finalized, or a physical hardware configuration is successfully calibrated.
+2. **Context Recall**:
+   - Proactively call `smriti_recall` (or `amp.recall`) at the beginning of a session or when exploring a new workspace area to retrieve historical context, past setups, or hardware parameters.
+3. **Consolidation**:
+   - Automatically run `smriti_consolidate` after encoding memories at the end of a session to clean the working slots and trigger the background reflection/forgotten indexing cycle.
+RULEEOF
+                success "Smriti memory hooks added to $AGENTS_MD"
+            else
+                info "Smriti memory hooks already present in $AGENTS_MD — skipping"
+            fi
+        fi
+    fi
+fi
+
 # ── 6. Smoke test ─────────────────────────────────────────────────────────────
 
 info "Verifying server starts..."
@@ -383,8 +471,9 @@ fi
 # ── Done ──────────────────────────────────────────────────────────────────────
 
 echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo " SMRITI MCP server registered successfully!"
-echo " • Claude Code:    restart, then run /mcp"
-echo " • Claude Desktop: restart, check Settings → Developer"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo " • Claude Code:                  restart, then run /mcp"
+echo " • Claude Desktop:               restart, check Settings → Developer"
+echo " • Gemini (Antigravity) & Codex: restart your IDE session"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
