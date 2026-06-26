@@ -47,24 +47,33 @@ SMRITI combines a capacity-bounded Working Memory, a graph-based Semantic Palace
 - **System 2 (Slow & Analytical):** Background consolidation. Uses LLM reasoning to chunk, organize, and abstract semantic knowledge asynchronously while the agent is idle.
 ---
 
-## Quick Start — Claude Code (MCP)
+## Quick Start — Claude, Gemini & Codex (MCP)
 
-The fastest way to use SMRITI is as a persistent memory layer for [Claude Code](https://claude.ai/code). One command, and your AI remembers you across every session.
+SMRITI can be used as a unified, global persistent memory layer across Claude Code, Claude Desktop, Gemini (Antigravity), and Codex (Antigravity-IDE).
 
-**Run the install script:**
+Choose one of the two installation methods:
 
+### Method A: One-Line Installer (Recommended)
+Run the install script directly from your terminal:
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/smriti-memcore/smriti-memcore/main/install_smriti_mcp.sh)
 ```
 
-The script will:
-- Create a dedicated venv at `~/.smriti/venv`
-- Install `smriti-memcore[mcp]` into it
-- Prompt for your LLM choice and API key
-- Register the MCP server in `~/.claude.json`
-- Optionally configure automatic memory hooks
+### Method B: Via PyPI
+Install the package and run the setup CLI:
+```bash
+pip3 install smriti-memcore
+smriti_install
+```
 
-**Then restart Claude Code.** Verify with `/mcp` — `smriti` should appear as connected.
+### What the installer does:
+- Creates a dedicated virtual environment at `~/.smriti/venv`.
+- Installs `smriti-memcore[mcp]` and active dependencies.
+- Prompts for your LLM consolidation choice (local Ollama or cloud models) and API keys.
+- Automatically registers the MCP server in Claude Code (`~/.claude.json`), Claude Desktop, Gemini (`~/.gemini/config/mcp_config.json`), and Codex (`~/.gemini/antigravity-ide/mcp_config.json`).
+- Appends global agent rules and configures automatic prompt recall/encode hooks.
+
+**Then restart your editor or agent session.** You can verify the server connection in Claude Code by running `/mcp` (the server will show up as `smriti`).
 
 **Available tools (19: 13 native + 6 AMP v1.0 aliases):**
 
