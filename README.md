@@ -1,6 +1,10 @@
+<p align="center">
+  <img src="figures/logo.jpg" alt="SMRITI Memory Logo" width="600" />
+</p>
+
 # SMRITI Memory
 
-> **Enterprise-grade, privacy-first Long-Term Memory (LTM) engine for AI agents and multi-agent systems.**
+> **Enterprise-grade, privacy-first Long-Term Memory (LTM) engine for LLM agents, multi-agent frameworks, and MCP clients.**
 
 [![PyPI](https://img.shields.io/pypi/v/smriti-memcore.svg)](https://pypi.org/project/smriti-memcore/)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
@@ -10,17 +14,37 @@
 
 ---
 
-SMRITI is a high-performance, neuro-inspired long-term memory architecture designed to give LLM agents persistent, structured recall without blocking real-time loops. By separating memory operations into System 1 (fast ingestion) and System 2 (asynchronous analytical consolidation), SMRITI provides a highly responsive, resource-efficient memory layer.
+## 💡 What is SMRITI?
 
-## 🚀 Key Features
+SMRITI is a high-performance, neuro-inspired long-term memory layer designed to give AI agents persistent, adaptive recall without blocking their real-time execution loop. 
 
-*   ⚡ **Dual-Process Architecture**: Decouples fast System 1 ingestion (append-only short-term buffer) from slow System 2 background consolidation (LLM-driven knowledge abstraction, relation extraction, and defragmentation).
-*   🔒 **Privacy-First (Private Rooms)**: Support for in-memory private semantic rooms and visibility tags (`private` vs. `shared`) to keep sensitive user information excluded from team-wide memory synchronization.
-*   🔌 **Out-of-the-Box MCP Server**: Natively compliant with the Model Context Protocol (MCP), supporting seamless integration with Claude Code, Claude Desktop, Gemini Antigravity, and Codex (Antigravity-IDE).
-*   📦 **Agent Memory Protocol (AMP v1.0) Support**: Standardized API endpoints (`amp.*` aliases) ensuring compatibility with any AMP-compliant agent framework.
-*   📊 **Visual Observability**: Zero-dependency interactive web interface (D3.js-based memory graph visualizer) and built-in Prometheus metrics.
-*   📂 **Obsidian Vault Syncing**: Automatically syncs the agent's Semantic Palace memory graph into an Obsidian vault for human curation and knowledge tracking.
-*   🧩 **Framework Integrations**: Simple wrappers and adapters for LangChain, LlamaIndex, and other popular Python agent frameworks.
+Inspired by human Dual-Process cognitive theory, SMRITI splits memory operations into:
+1. **System 1 (Immediate Heuristics)**: Decoupled, millisecond-level ingestion of raw interactions into an append-only Episode Buffer.
+2. **System 2 (Async Consolidation)**: Background LLM-driven consolidation that extracts knowledge graphs, resolves contradictions, identifies skills, and decays weak memories.
+
+---
+
+## ⚔️ SMRITI vs. Naive RAG & Vector Databases
+
+| Feature | Naive RAG / Vector DBs | SMRITI Memory Engine |
+|---|---|---|
+| **Latency** | Scales linearly with context size; blocks agent loops | **Sub-5ms ingestion** (System 1); System 2 is asynchronous |
+| **Context Window** | Stuffs raw logs, leading to prompt bloat and distraction | **Miller's Law (7 ± 2 slots)** capacity-bounded Working Memory |
+| **Data Evolution** | Static embeddings; struggles with contradictions/corrections | **Automatic conflict resolution**, abstraction, and temporal decay |
+| **Relationships** | Flat vector search; no concept of entity links | **Semantic Palace Graph** showing structured Room/Topic associations |
+| **Privacy & Sync** | All-or-nothing storage; complex namespace routing | **Private Rooms** and `private=True` tags natively isolating user syncs |
+
+---
+
+## 🚀 Key Capabilities
+
+*   🧠 **Dual-Process Performance**: Zero-blocking real-time loops. Write immediately, analyze when idle.
+*   🔒 **Privacy-First (Private Rooms)**: Create local semantic rooms whose memories are automatically excluded from shared/team-wide sync.
+*   🔌 **Model Context Protocol (MCP)**: Native MCP server integration with Claude Code, Claude Desktop, Gemini Antigravity, and Codex.
+*   📦 **AMP v1.0 Spec Compliant**: Drop-in compatibility with any agent framework conforming to the Agent Memory Protocol.
+*   📊 **Visual Graph Explorer**: Clean D3.js-based visualization interface with Prometheus metrics monitoring.
+*   📂 **Obsidian Vault Integration**: Automatically syncs your agent's memory graph into an Obsidian vault for human curation.
+*   🧩 **Framework Agnostic**: Integrates natively with LangChain, LlamaIndex, CrewAI, and AutoGen.
 
 ---
 
@@ -54,9 +78,6 @@ SMRITI is a high-performance, neuro-inspired long-term memory architecture desig
                  └──────────┘   └───────────────────┘
 ```
 
-*   **System 1 (Heuristic Pathway)**: Routes incoming raw interactions immediately to the short-term Episode Buffer in milliseconds.
-*   **System 2 (Analytical Pathway)**: Runs asynchronously in the background. It structures raw logs into the **Semantic Palace Graph**, handles contradiction resolution, extracts skills, and decays weak memories over time.
-
 ---
 
 ## 🏁 Quick Start
@@ -77,8 +98,6 @@ Install the package and run the setup CLI:
 pip3 install smriti-memcore
 smriti_install
 ```
-
-*The installer configures a Python virtual environment, prompts for your preferred LLM provider, and registers the server in Claude, Gemini, and Codex config files.*
 
 ---
 
@@ -126,7 +145,7 @@ SMRITI exposes **19 tools** (13 native + 6 AMP aliases) for clients:
 | Tool Name | Description |
 |---|---|
 | `smriti_encode` | Ingests a new memory. Accept `private=True` to exclude from team syncs. |
-| `smriti_recall` | Retrieves memories using semantic and graph-based traversal. |
+| `smriti_recall` | Retrieves memories using semantic and graph-based retrieval. |
 | `smriti_get_context` | Helper to inject the current active working memory slots into the context window. |
 | `smriti_how_well_do_i_know` | Performs a meta-memory confidence check on a given topic. |
 | `smriti_knowledge_gaps` | Identifies topics the agent has identified it needs more information on. |
