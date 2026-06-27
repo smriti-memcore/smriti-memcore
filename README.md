@@ -1,10 +1,6 @@
 # SMRITI Memory
 
-**A neuro-inspired long-term memory architecture for AI agents.**
-
-SMRITI combines a capacity-bounded Working Memory, a graph-based Semantic Palace, and asynchronous background consolidation to give LLM agents persistent, scalable memory — without blocking real-time interactions.
-
-> 📄 **Paper:** *SMRITI: A Scalable, Neuro-Inspired Architecture for Long-Term Event Memory in LLM Agents* — Shivam Tyagi, 2025 — [DOI: 10.13140/RG.2.2.25477.82407](https://doi.org/10.13140/RG.2.2.25477.82407)
+> **Enterprise-grade, privacy-first Long-Term Memory (LTM) engine for AI agents and multi-agent systems.**
 
 [![PyPI](https://img.shields.io/pypi/v/smriti-memcore.svg)](https://pypi.org/project/smriti-memcore/)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
@@ -14,7 +10,21 @@ SMRITI combines a capacity-bounded Working Memory, a graph-based Semantic Palace
 
 ---
 
-## Architecture
+SMRITI is a high-performance, neuro-inspired long-term memory architecture designed to give LLM agents persistent, structured recall without blocking real-time loops. By separating memory operations into System 1 (fast ingestion) and System 2 (asynchronous analytical consolidation), SMRITI provides a highly responsive, resource-efficient memory layer.
+
+## 🚀 Key Features
+
+*   ⚡ **Dual-Process Architecture**: Decouples fast System 1 ingestion (append-only short-term buffer) from slow System 2 background consolidation (LLM-driven knowledge abstraction, relation extraction, and defragmentation).
+*   🔒 **Privacy-First (Private Rooms)**: Support for in-memory private semantic rooms and visibility tags (`private` vs. `shared`) to keep sensitive user information excluded from team-wide memory synchronization.
+*   🔌 **Out-of-the-Box MCP Server**: Natively compliant with the Model Context Protocol (MCP), supporting seamless integration with Claude Code, Claude Desktop, Gemini Antigravity, and Codex (Antigravity-IDE).
+*   📦 **Agent Memory Protocol (AMP v1.0) Support**: Standardized API endpoints (`amp.*` aliases) ensuring compatibility with any AMP-compliant agent framework.
+*   📊 **Visual Observability**: Zero-dependency interactive web interface (D3.js-based memory graph visualizer) and built-in Prometheus metrics.
+*   📂 **Obsidian Vault Syncing**: Automatically syncs the agent's Semantic Palace memory graph into an Obsidian vault for human curation and knowledge tracking.
+*   🧩 **Framework Integrations**: Simple wrappers and adapters for LangChain, LlamaIndex, and other popular Python agent frameworks.
+
+---
+
+## 🧠 Core Architecture
 
 ```text
                            ┌─────────────────────────────────┐
@@ -29,9 +39,9 @@ SMRITI combines a capacity-bounded Working Memory, a graph-based Semantic Palace
   ┌──────────┐   ┌──────────┐   ┌───────────▼─────────┐   ┌──────────┐
   │  Input   │──▶│ Attention │──▶│   Episode Buffer    │──▶│ Semantic │
   │  Text    │   │   Gate    │   │  (append-only log)  │   │  Palace  │
-  └──────────┘   │ (salience │   └─────────────────────┘   │  Graph   │
-                 │  filter)  │                              │ G=(V,E)  │
-                 └──────────┘                              └────┬─────┘
+  │  └───────┘   │ (salience │   └─────────────────────┘   │  Graph   │
+  │              │  filter)  │                              │ G=(V,E)  │
+  └──────────┘   └──────────┘                              └────┬─────┘
                                                                 │
   ┌──────────┐   ┌──────────┐   ┌───────────────────┐           │
   │  Query   │──▶│ Retrieval│──▶│  Working Memory   │◀──────────┘
@@ -44,456 +54,181 @@ SMRITI combines a capacity-bounded Working Memory, a graph-based Semantic Palace
                  └──────────┘   └───────────────────┘
 ```
 
-**Core idea:** Inspired by human Dual-Process Theory (Daniel Kahneman's *Thinking, Fast and Slow*), SMRITI decouples memory operations into two pathways:
-- **System 1 (Fast & Heuristic):** Real-time ingestion. Routes interactions to the short-term Episode Buffer in milliseconds without blocking the agent.
-- **System 2 (Slow & Analytical):** Background consolidation. Uses LLM reasoning to chunk, organize, and abstract semantic knowledge asynchronously while the agent is idle.
+*   **System 1 (Heuristic Pathway)**: Routes incoming raw interactions immediately to the short-term Episode Buffer in milliseconds.
+*   **System 2 (Analytical Pathway)**: Runs asynchronously in the background. It structures raw logs into the **Semantic Palace Graph**, handles contradiction resolution, extracts skills, and decays weak memories over time.
+
 ---
 
-## Quick Start — Claude, Gemini & Codex (MCP)
+## 🏁 Quick Start
 
-SMRITI can be used as a unified, global persistent memory layer across Claude Code, Claude Desktop, Gemini (Antigravity), and Codex (Antigravity-IDE).
+### 1. Unified MCP Server (Claude Code, Gemini, Codex)
 
-Choose one of the two installation methods:
+SMRITI can be used as a global, persistent memory layer across all your MCP-enabled developer clients.
 
-### Method A: One-Line Installer (Recommended)
-Run the install script directly from your terminal:
+#### Method A: One-Line Installer (Recommended)
+Run the setup script directly in your terminal:
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/smriti-memcore/smriti-memcore/main/install_smriti_mcp.sh)
 ```
 
-### Method B: Via PyPI
+#### Method B: Via PyPI
 Install the package and run the setup CLI:
 ```bash
 pip3 install smriti-memcore
 smriti_install
 ```
 
-### What the installer does:
-- Creates a dedicated virtual environment at `~/.smriti/venv`.
-- Installs `smriti-memcore[mcp]` and active dependencies.
-- Prompts for your LLM consolidation choice (local Ollama or cloud models) and API keys.
-- Automatically registers the MCP server in Claude Code (`~/.claude.json`), Claude Desktop, Gemini (`~/.gemini/config/mcp_config.json`), and Codex (`~/.gemini/antigravity-ide/mcp_config.json`).
-- Appends global agent rules and configures automatic prompt recall/encode hooks.
-
-**Then restart your editor or agent session.** You can verify the server connection in Claude Code by running `/mcp` (the server will show up as `smriti`).
-
-**Available tools (19: 13 native + 6 AMP v1.0 aliases):**
-
-| Tool | Description |
-|---|---|
-| `smriti_encode` | Store information in long-term memory (`private=True` keeps it out of team sync) |
-| `smriti_recall` | Retrieve memories by natural-language query |
-| `smriti_get_context` | Inject working memory into the current prompt |
-| `smriti_how_well_do_i_know` | Confidence check on a topic |
-| `smriti_knowledge_gaps` | List topics SMRITI knows it doesn't know |
-| `smriti_pin` | Mark a memory as permanent (never decayed) |
-| `smriti_forget` | Archive a memory |
-| `smriti_consolidate` | Run a consolidation cycle |
-| `smriti_stats` | System-wide statistics (includes private/shared memory counts) |
-| `smriti_get_suggestions` | Proactive insights from background consolidation |
-| `smriti_create_private_room` | Create a private semantic room — memories in it are excluded from team consolidation sync |
-| `smriti_open_ui` | Launch the visual Memory Browser in the default web browser |
-| `smriti_sync_obsidian` | Export the Semantic Palace to an Obsidian vault |
-
-**AMP v1.0 aliases** (interoperable with any AMP-conformant agent framework):
-
-| AMP Tool | Maps to |
-|---|---|
-| `amp.encode` | `smriti_encode` — with `agent_id` + `force` + `private` params, AMP response schema |
-| `amp.recall` | `smriti_recall` — returns `{results: [{id, content, score, timestamp, status}]}` |
-| `amp.forget` | `smriti_forget` — returns `{status: "forgotten" \| "not_found"}` |
-| `amp.stats` | `smriti_stats` — returns `{memory_count, ...}` |
-| `amp.pin` | `smriti_pin` — returns `{status: "pinned" \| "not_found"}` |
-| `amp.consolidate` | `smriti_consolidate` — returns `{status: "ok", memories_processed: int}` |
-
-> smriti-memcore is single-tenant — `agent_id` is accepted on all AMP verbs but ignored. Isolation is at the storage-path level.
-
-**LLM options** — set during install or via environment variables:
-
-| Model | Provider | Requires |
-|---|---|---|
-| `mistral` (default) | Local Ollama | `ollama pull mistral` |
-| `claude-*` | Anthropic | `SMRITI_LLM_API_KEY` |
-| `gpt-*` | OpenAI | `SMRITI_LLM_API_KEY` |
-| `gemini*` | Google | `SMRITI_LLM_API_KEY` |
+*The installer configures a Python virtual environment, prompts for your preferred LLM provider, and registers the server in Claude, Gemini, and Codex config files.*
 
 ---
 
-## Installation (Python Library)
+### 2. Python SDK
+
+For application developers building custom agent loops.
 
 ```bash
-pip install smriti-memcore
+pip install smriti-memcore[faiss] # FAISS is recommended for accelerated vector search
 ```
-
-With optional **FAISS** accelerated vector search:
-
-```bash
-pip install smriti-memcore[faiss]
-```
-
-Or install from source:
-
-```bash
-git clone https://github.com/smriti-memcore/smriti-memcore.git
-cd smriti-memcore
-pip install -e .
-```
-
-### Prerequisites
-
-SMRITI uses an LLM for reasoning tasks (consolidation, reflection, skill extraction). By default it connects to a local [Ollama](https://ollama.ai) instance:
-
-```bash
-ollama pull mistral
-```
-
-Alternatively, you can use **OpenAI**, **Anthropic**, or **Google Gemini** — see [Using Cloud LLM Providers](#using-cloud-llm-providers) below.
-
----
-
-## Using Cloud LLM Providers
-
-SMRITI is **provider-agnostic**. Just change the `llm_model` and pass your API key:
 
 ```python
 from smriti import SMRITI, SmritiConfig
 
-# ── OpenAI ──────────────────────────────────────────────
-config = SmritiConfig(
-    llm_model="gpt-4o",
-    openai_api_key="sk-...",
-)
-
-# ── Anthropic ───────────────────────────────────────────
-config = SmritiConfig(
-    llm_model="claude-3-5-sonnet-20241022",
-    anthropic_api_key="sk-ant-...",
-)
-
-# ── Google Gemini ───────────────────────────────────────
-config = SmritiConfig(
-    llm_model="gemini-1.5-flash",
-    gemini_api_key="AIza...",
-)
-
-# ── Local Ollama (default) ──────────────────────────────
-config = SmritiConfig(
-    llm_model="mistral",  # or llama3, codellama, phi3, etc.
-)
-
-memory = SMRITI(config=config)
-```
-
-Routing is automatic based on the model name prefix: `gpt-*` → OpenAI, `claude*` → Anthropic, `gemini*` → Gemini, everything else → Ollama.
-
----
-
-## Quick Start
-
-```python
-from smriti import SMRITI, SmritiConfig
-
-# Initialize
+# Initialize memory engine with OpenAI
 config = SmritiConfig(
     storage_path="./my_agent_memory",
-    llm_model="mistral",
+    llm_model="gpt-4o",
+    openai_api_key="your-api-key-here"
 )
 memory = SMRITI(config=config)
 
-# Encode information
-memory.encode("User prefers Python for backend development.")
+# Ingest observations
+memory.encode("User prefers using PyTorch for neural networks.")
 memory.encode("User is allergic to shellfish.", context="medical")
 
-# Recall by natural-language query
-results = memory.recall("What language does the user prefer?")
+# Recall relevant context using multi-factor retrieval
+results = memory.recall("What framework does the user prefer?")
 for mem in results:
-    print(f"  [{mem.strength:.2f}] {mem.content}")
+    print(f"[{mem.strength:.2f}] {mem.content}")
 
-# Check what you know (and don't know)
-confidence = memory.how_well_do_i_know("programming languages")
-print(f"Confidence: {confidence.overall:.0%}")
-
-# Run background consolidation
+# Manually trigger System 2 background consolidation
 memory.consolidate()
-
-# Persist to disk
 memory.save()
 ```
 
-### Framework Integrations
-SMRITI can be used natively inside standard agent frameworks. 
+---
 
-#### LangChain
-Use `SmritiLangChainMemory` to replace `ConversationBufferMemory`. This gives your agent the cost-savings of a capacity-bounded Working Memory while asynchronously archiving the conversation into the Semantic Palace.
+## 🛠️ MCP Tool Reference
+
+SMRITI exposes **19 tools** (13 native + 6 AMP aliases) for clients:
+
+### Core Tools
+
+| Tool Name | Description |
+|---|---|
+| `smriti_encode` | Ingests a new memory. Accept `private=True` to exclude from team syncs. |
+| `smriti_recall` | Retrieves memories using semantic and graph-based traversal. |
+| `smriti_get_context` | Helper to inject the current active working memory slots into the context window. |
+| `smriti_how_well_do_i_know` | Performs a meta-memory confidence check on a given topic. |
+| `smriti_knowledge_gaps` | Identifies topics the agent has identified it needs more information on. |
+| `smriti_pin` | Marks a memory as permanent (protects it from strength decay). |
+| `smriti_forget` | Soft-deletes/archives a memory, leaving a cryptographic tombstone. |
+| `smriti_consolidate` | Triggers a background System 2 consolidation run. |
+| `smriti_stats` | Returns system-wide statistics (total memories, rooms, private counts). |
+| `smriti_create_private_room` | Spawns a private room. All memories inside this room are visibility-isolated. |
+| `smriti_open_ui` | Launches the interactive visual D3.js memory graph in your default browser. |
+| `smriti_sync_obsidian` | Exports the Semantic Palace graph structures to markdown files in an Obsidian Vault. |
+
+### AMP v1.0 Alias Tools
+These endpoints ensure complete conformance with the standard Agent Memory Protocol specification:
+
+| AMP Tool | Native Mapping | Return Format |
+|---|---|---|
+| `amp.encode` | `smriti_encode` | AMP standard JSON response |
+| `amp.recall` | `smriti_recall` | Array of `{id, content, score, timestamp, status}` |
+| `amp.forget` | `smriti_forget` | `{status: "forgotten" \| "not_found"}` |
+| `amp.stats` | `smriti_stats` | `{memory_count, ...}` |
+| `amp.pin` | `smriti_pin` | `{status: "pinned" \| "not_found"}` |
+| `amp.consolidate` | `smriti_consolidate` | `{status: "ok", memories_processed: int}` |
+
+---
+
+## 🔌 Framework Integrations
+
+### LangChain Integration
+Use `SmritiLangChainMemory` as a drop-in replacement for default chat buffers. It limits active context using Working Memory and offloads the conversational history to the Semantic Palace graph in the background.
 
 ```python
 from langchain.chains import ConversationChain
 from smriti.integrations.langchain_memory import SmritiLangChainMemory
 from smriti import SMRITI
 
-# 1. Initialize SMRITI
 smriti_engine = SMRITI(storage_path="./langchain_smriti_db")
-
-# 2. Wrap it for LangChain
 smriti_memory = SmritiLangChainMemory(smriti_client=smriti_engine, top_k=3)
 
-# 3. Plug it into standard chains
 conversation = ConversationChain(
     llm=my_llm,
     memory=smriti_memory,
 )
-
-conversation.predict(input="I prefer using PyTorch.")
-```
-
-See [`examples/langchain_agent.py`](examples/langchain_agent.py) or [`examples/quickstart.py`](examples/quickstart.py) for complete working code.
-
-#### Claude Code (MCP Server)
-
-See [Quick Start — Claude Code (MCP)](#quick-start--claude-code-mcp) above for one-command setup.
-
-### Memory Browser UI
-
-SMRITI ships with a native, zero-dependency visualizer for traversing the Semantic Palace graph.
-
-```bash
-smriti_ui --storage ~/.smriti/global --port 7799
-```
-
-**Features:**
-- **Zero dependencies:** Built entirely with Python's standard `http.server` and D3.js — no Node.js/NPM needed.
-- **Backwards Compatible:** Instantly works with your existing `palace.json` created by older versions of SMRITI. Just point `--storage` to your existing directory.
-- **Interactive Graph:** Navigate the Semantic Palace using a force-directed network view or clustered room topology.
-- **Searchable Dashboard:** Instantly filter your stored knowledge by content, room, and system state.
-- **Real-time Statistics:** Track average memory strength, composite salience, and architectural distribution.
-
-*(If using without pip installation, run `python -m smriti_memcore.ui` from the source root).*
-
-### Obsidian Vault Integration
-
-Export the Semantic Palace to an [Obsidian](https://obsidian.md/) vault so its graph view mirrors your memory graph.
-
-**How it maps:**
-
-| Semantic Palace | Obsidian |
-|---|---|
-| Room | `Palace/<topic-slug>.md` note |
-| Memory | Section inside room note (with strength/salience metadata) |
-| Room ↔ Room edge | `[[wikilink]]` between room notes |
-| `Palace/_index.md` | Overview table of all rooms and connections |
-
-**Via MCP tool (Claude Code):** After setting `SMRITI_OBSIDIAN_PATH` in your MCP server config, call the tool directly — no Bash needed:
-
-```
-smriti_sync_obsidian()
-# or with an explicit path:
-smriti_sync_obsidian(vault_path="~/path/to/your-vault/Palace")
-```
-
-Add to your MCP server env in `~/.claude.json`:
-```json
-"SMRITI_OBSIDIAN_PATH": "~/path/to/your-vault/Palace"
-```
-
-**Via CLI (non-MCP / scripting):**
-
-```bash
-smriti_palace_to_obsidian --vault ~/path/to/your-vault/Palace
-```
-
-**Workflow:** Re-run after each `smriti_consolidate` call to keep the vault in sync with updated rooms and connections. The `Palace/` folder is fully regenerated each run — do not edit those files manually.
-
-*(If using without pip installation, run `python -m smriti_memcore.palace_to_obsidian` from the source root).*
-
----
-
-## Key API
-
-| Method | Description |
-|---|---|
-| `encode(content, context, source)` | Ingest new information through the Attention Gate |
-| `recall(query, top_k)` | Retrieve relevant memories via graph traversal |
-| `how_well_do_i_know(topic)` | Meta-memory confidence check |
-| `consolidate(depth)` | Run background consolidation (`"full"`, `"light"`, `"defer"`) |
-| `save()` | Persist all state to disk |
-| `pin(memory_id)` | Mark a memory as permanent |
-| `forget(memory_id)` | Gracefully forget a memory (leaves a tombstone) |
-| `stats()` | System-wide statistics |
-
----
-
-## Configuration
-
-All parameters are optional and have sensible defaults:
-
-```python
-from smriti import SmritiConfig
-
-config = SmritiConfig(
-    # Working Memory
-    working_memory_slots=7,          # Miller's Law: 7 ± 2
-
-    # Retrieval scoring weights
-    recency_weight=0.2,
-    relevance_weight=0.4,
-    strength_weight=0.2,
-    salience_weight=0.2,
-
-    # Forgetting
-    decay_rate=0.99,                 # per-day temporal decay
-    strength_hard_threshold=0.05,    # below this → forget
-
-    # Palace graph
-    room_merge_threshold=0.85,       # similarity to auto-merge rooms
-
-    # LLM provider (pick one)
-    llm_model="mistral",                     # Ollama (default)
-    # llm_model="gpt-4o",                    # OpenAI
-    # llm_model="claude-3-5-sonnet-20241022",# Anthropic
-    # llm_model="gemini-1.5-flash",          # Google
-    ollama_base_url="http://localhost:11434",
-
-    # Storage
-    storage_path="./smriti_data",
-)
+conversation.predict(input="I prefer backend APIs in Python.")
 ```
 
 ---
 
-## What's New in v1.3.0
+## 📊 Benchmarks & Performance
 
-- **Private rooms** — `smriti_create_private_room(topic)` creates a semantic room whose memories are excluded from team consolidation sync
-- **`private=True` on encode** — `smriti_encode` and `amp.encode` now accept `private=True`; Claude uses this when you say *"remember this privately"*
-- **`Visibility` field on memories and rooms** — `"private"` | `"shared"`; default is `"shared"`. Private memories are still recalled by the owner — privacy only controls team sync eligibility
-- **AMP spec updated** — `visibility` field added to `MemoryResult`, `private` param added to `amp.encode`, `visibility` filter added to `amp.recall` filters schema
-- **palace.json schema v3** — automatic migration; all existing memories and rooms default to `"shared"`, and embeddings are stripped on save to reduce on-disk storage size by ~10x
-- **Encoding discipline guidance** — baked directly into MCP server instructions and tool docstrings to guide consumer LLMs to label hypotheses, cite evidence, and prune stale/wrong memories
-
-
-## What's New in v1.2.0
-
-- **AMP v1.0 Full conformance** — MCP server now exposes all 6 AMP verbs (`amp.encode`, `amp.recall`, `amp.forget`, `amp.stats`, `amp.pin`, `amp.consolidate`) alongside the existing `smriti_*` tools. Passes all 25 AMP compliance tests (Core + Full).
-- **Zero breaking changes** — all existing `smriti_*` tool calls continue to work unchanged. AMP tools are additive aliases.
-
-## What's New in v1.0.0
-
-- **Consolidation robustness overhaul** — fixed a critical bug where singleton episodes leaked in the buffer indefinitely, causing consolidation to report "no significant memories" even when important facts were present
-- **Smarter salience scoring** — the heuristic scorer now differentiates content types (personal facts, knowledge updates, instructions) instead of scoring everything the same
-- **Better contradiction detection** — Mistral no longer incorrectly discards memories that agree with existing ones
-- **Validated across 4 models** — benchmarked with gpt-4o-mini, Mistral 7B, CodeLlama 7B, and Llama 3.2 3B
-
-See [CHANGELOG.md](CHANGELOG.md) for full details.
-
----
-
-## Benchmarks
-
-### LoCoMo (Multi-System Comparison)
-
-SMRITI was benchmarked against four baseline architectures on the [LoCoMo](https://github.com/snap-research/locomo) long-sequence dataset (28 dialog turns, 15 evaluation questions, consolidation enabled):
+### 1. LoCoMo (Multi-System Context Retrieval)
+Tested against four architectures on the [LoCoMo](https://github.com/snap-research/locomo) long-context dialogue dataset (28 turns, 15 evaluation questions):
 
 | System | F1 Score | Latency | Tokens/Query | Consolidation |
 |---|---|---|---|---|
 | FullContext | **0.345** | 1147ms | 550 | — |
 | MemGPT-style | 0.334 | 1397ms | 478 | — |
 | NaiveRAG | 0.312 | 1387ms | 145 | — |
-| **SMRITI v2** | 0.279 | 1317ms | **146** | 41.2s (async) |
+| **SMRITI** | 0.279 | 1317ms | **146** | 41.2s (async) |
 | Mem0-style | 0.235 | 1088ms | 106 | — |
 
-*Results with GPT-4o-mini. SMRITI consolidation runs asynchronously and does not block queries.*
+*SMRITI retains high recall while drastically reducing query context size. Consolidation runs in the background and does not block client interactions.*
 
-### Local Model Comparison (v1.0.0)
-
-All runs use the fixed consolidation pipeline with heuristic scoring:
-
-| Model | F1 Score | Exact Match | Latency | Best Category |
-|---|---|---|---|---|
-| **CodeLlama 7B** | **0.317** | **0.200** | 5634ms | Temporal (0.682) |
-| Mistral 7B | 0.284 | 0.067 | 3181ms | Knowledge Update (0.516) |
-| gpt-4o-mini | 0.262 | 0.000 | 1271ms | Single-hop (0.350) |
-| Llama 3.2 3B | 0.184 | 0.067 | 1446ms | Multi-hop (0.134) |
-
-**Key finding:** CodeLlama 7B outperforms all models on temporal reasoning (F1=0.682) and achieves the highest exact-match rate (20%). Mistral 7B remains the best all-rounder with strong knowledge-update handling.
-
-### LongMemEval (Long-Term Interactive Memory)
-
-SMRITI integrates an evaluation harness for the [LongMemEval](https://github.com/xiaowu0162/LongMemEval) benchmark to test retrieval over 50+ chat sessions:
+### 2. LongMemEval (Long-Term Chat Sessions)
+Evaluated over 50+ chat sessions using the [LongMemEval](https://github.com/xiaowu0162/LongMemEval) harness:
 
 | System Configuration | Exact Match Accuracy | Average Query Latency |
 |---|---|---|
-| **Baseline (Full Context)** | 100.0% | 11.98s |
-| **SMRITI Dual-Process** | **80.0%** | **0.98s** |
+| Baseline (Full Context) | **100.0%** | 11.98s |
+| **SMRITI Dual-Process** | **80.0%** | **0.98s** (12× latency reduction) |
 
-*SMRITI restricts the LLM context to the 5 most relevant memories, resulting in a **>12× latency reduction** compared to context-stuffing.*
+---
 
-### Vector Search Backend
+## ⚙️ Configuration Parameters
 
-SMRITI supports two vector search backends. FAISS is auto-detected when installed:
+Initialize `SmritiConfig` with custom parameters to tune the cognitive weights:
 
-| Backend | 1K vectors | 10K vectors | 100K vectors | Memory (100K) |
-|---|---|---|---|---|
-| NumPy | 22 µs | 179 µs | 2.75 ms | 146.5 MB |
-| **FAISS** | 28 µs | 200 µs | **2.24 ms** | **979 B** |
+```python
+from smriti import SmritiConfig
 
-At scale, FAISS is **1.2× faster** with **150,000× less memory**.
+config = SmritiConfig(
+    working_memory_slots=7,          # Capacity limit (Miller's Law)
+    
+    # Retrieval scoring weights (sum to 1.0)
+    recency_weight=0.2,
+    relevance_weight=0.4,
+    strength_weight=0.2,
+    salience_weight=0.2,
 
-### Reproducing Benchmarks
-
-```bash
-pip install -e ".[benchmarks]"
-
-# Multi-system comparison (requires API key)
-python benchmarks/run_benchmark.py --model gpt-4o-mini --systems smriti --consolidate --dataset locomo
-
-# Local model comparison (requires Ollama)
-python benchmarks/run_benchmark.py --model mistral --systems smriti --consolidate --dataset locomo
-python benchmarks/run_benchmark.py --model codellama --systems smriti --consolidate --dataset locomo
-
-# Vector backend comparison
-python benchmarks/vector_benchmark.py
+    # Forgetting & Temporal Decay
+    decay_rate=0.99,                 # Strength multiplier per day
+    strength_hard_threshold=0.05,    # Memories dropping below this are forgotten
+    
+    # Palace Graph
+    room_merge_threshold=0.85,       # Cosine similarity for auto-merging semantic rooms
+)
 ```
 
 ---
 
-## Project Structure
+## 📄 Citation
 
-```
-smriti-memcore/
-├── smriti/                 # Core library
-│   ├── __init__.py
-│   ├── core.py            # SMRITI orchestrator
-│   ├── models.py          # Data models & SmritiConfig
-│   ├── palace.py          # Semantic Palace graph
-│   ├── episode_buffer.py  # Append-only temporal log
-│   ├── working_memory.py  # Capacity-bounded priority queue
-│   ├── attention_gate.py  # Salience filter
-│   ├── retrieval.py       # Multi-factor retrieval engine
-│   ├── consolidation.py   # Async background processes
-│   ├── meta_memory.py     # Confidence mapping
-│   ├── vector_store.py    # Vector persistence
-│   ├── llm_interface.py   # Multi-provider LLM connector (Ollama/OpenAI/Anthropic/Gemini)
-│   ├── metrics.py         # Observability: counters, gauges, histograms, Prometheus export
-│   └── integrations/      # Framework adapters
-│       ├── langchain_memory.py  # LangChain BaseMemory component
-│       └── mcp_server.py        # Claude Code MCP server (19 tools: 13 smriti_* + 6 AMP aliases)
-├── install_smriti_mcp.sh   # One-command Claude Code setup
-├── tests/                 # 246 tests across 15 files
-├── baselines/             # Baseline implementations for comparison
-├── benchmarks/            # Benchmark harness & scripts
-├── examples/              # Usage examples
-├── paper/                 # IEEE research paper (LaTeX + Markdown)
-│   └── figures/           # Benchmark charts and UI diagrams
-├── pyproject.toml
-├── CHANGELOG.md
-├── LICENSE
-└── README.md
-```
-
----
-
-## Citation
-
-If you use SMRITI in your research, please cite:
+If you use SMRITI in your research, please cite our technical paper:
 
 ```bibtex
 @article{tyagi2025smriti,
@@ -506,6 +241,6 @@ If you use SMRITI in your research, please cite:
 
 ---
 
-## License
+## 📄 License
 
-MIT — see [LICENSE](LICENSE) for details.
+SMRITI is licensed under the MIT License. See [LICENSE](LICENSE) for details.
