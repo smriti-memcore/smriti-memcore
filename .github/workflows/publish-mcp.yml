@@ -2,43 +2,54 @@ name: Publish to PyPI & MCP Registry
 
 on:
   push:
-    tags: ["v*"] # Triggers on version tags like v1.4.5
+    branches: [ "main" ] # Triggers on every push to main
 
 jobs:
   publish:
+    # Avoid running on version bump commits created by this workflow
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     permissions:
       id-token: write # Required for OIDC authentication (PyPI trusted publisher + MCP Registry)
-      contents: read
+      contents: write # Required to commit, push version bumps, and push tags
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-
-      ### ── Build & publish to PyPI ──────────────────────────────
+        with:
+          fetch-depth: 0 # Fetch all history to push commits/tags properly
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
+      ### ── Increment Version ─────────────────────────────────────
+
+      - name: Bump version
+        id: version_bump
+        run: |
+          NEW_VERSION=$(python scripts/bump_version.py | grep "Bumped pyproject.toml to" | awk '{print $NF}')
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New Version: $NEW_VERSION"
+
+      - name: Commit and push version bump
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml server.json
+          git commit -m "Bump version to ${{ steps.version_bump.outputs.version }} [skip ci]"
+          git push origin main
+
+      - name: Tag release
+        run: |
+          git tag v${{ steps.version_bump.outputs.version }}
+          git push origin v${{ steps.version_bump.outputs.version }}
+
+      ### ── Build & publish to PyPI ──────────────────────────────
+
       - name: Install build tools
         run: pip install build
-
-      - name: Verify tag matches pyproject.toml version
-        run: |
-          TAG_VERSION=${GITHUB_REF#refs/tags/v}
-          TOML_VERSION=$(python -c "
-          import re, pathlib
-          text = pathlib.Path('pyproject.toml').read_text()
-          m = re.search(r'^version\s*=\s*\"([^\"]+)\"', text, re.MULTILINE)
-          print(m.group(1))
-          ")
-          if [ "$TAG_VERSION" != "$TOML_VERSION" ]; then
-            echo "❌ Tag version ($TAG_VERSION) does not match pyproject.toml ($TOML_VERSION)"
-            exit 1
-          fi
-          echo "✅ Versions match: $TAG_VERSION"
 
       - name: Build package
         run: python -m build
@@ -56,16 +67,6 @@ jobs:
 
       - name: Authenticate to MCP Registry
         run: ./mcp-publisher login github-oidc
-
-      - name: Sync version in server.json
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          jq --arg v "$VERSION" '
-            .version = $v |
-            .packages[0].version = $v
-          ' server.json > server.tmp && mv server.tmp server.json
-          echo "Updated server.json to version $VERSION"
-          cat server.json
 
       - name: Publish to MCP Registry
         run: ./mcp-publisher publish
