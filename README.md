@@ -10,6 +10,8 @@ SMRITI combines a capacity-bounded Working Memory, a graph-based Semantic Palace
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+<!-- mcp-name: io.github.shivamtyagi18/smriti-memory -->
+
 ---
 
 ## Architecture

@@ -1,0 +1,71 @@
+name: Publish to PyPI & MCP Registry
+
+on:
+  push:
+    tags: ["v*"] # Triggers on version tags like v1.4.5
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for OIDC authentication (PyPI trusted publisher + MCP Registry)
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      ### ── Build & publish to PyPI ──────────────────────────────
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install build
+
+      - name: Verify tag matches pyproject.toml version
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          TOML_VERSION=$(python -c "
+          import re, pathlib
+          text = pathlib.Path('pyproject.toml').read_text()
+          m = re.search(r'^version\s*=\s*\"([^\"]+)\"', text, re.MULTILINE)
+          print(m.group(1))
+          ")
+          if [ "$TAG_VERSION" != "$TOML_VERSION" ]; then
+            echo "❌ Tag version ($TAG_VERSION) does not match pyproject.toml ($TOML_VERSION)"
+            exit 1
+          fi
+          echo "✅ Versions match: $TAG_VERSION"
+
+      - name: Build package
+        run: python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # Uses OIDC trusted publishing — no API token needed.
+        # Configure at: https://pypi.org/manage/project/smriti-memcore/settings/publishing/
+
+      ### ── Publish to MCP Registry ─────────────────────────────
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate to MCP Registry
+        run: ./mcp-publisher login github-oidc
+
+      - name: Sync version in server.json
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          jq --arg v "$VERSION" '
+            .version = $v |
+            .packages[0].version = $v
+          ' server.json > server.tmp && mv server.tmp server.json
+          echo "Updated server.json to version $VERSION"
+          cat server.json
+
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish
