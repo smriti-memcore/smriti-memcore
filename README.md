@@ -1,10 +1,12 @@
 <p align="center">
-  <img src="figures/logo.png" alt="SMRITI Memcore Logo" width="120" />
+  <img src="figures/logo.png" alt="SMRITI Memcore Logo" width="220" />
 </p>
 
-# SMRITI Memcore
+<h1 align="center">SMRITI Memcore</h1>
 
-> **Enterprise-grade, privacy-first Long-Term Memory (LTM) engine for LLM agents, multi-agent frameworks, and MCP clients.**
+<p align="center">
+  <strong>Enterprise-grade, privacy-first Long-Term Memory (LTM) engine for LLM agents, multi-agent frameworks, and MCP clients.</strong>
+</p>
 
 [![PyPI](https://img.shields.io/pypi/v/smriti-memcore.svg)](https://pypi.org/project/smriti-memcore/)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
