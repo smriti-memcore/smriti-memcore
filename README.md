@@ -4,9 +4,14 @@
   <strong>Enterprise-grade, privacy-first Long-Term Memory (LTM) engine for LLM agents, multi-agent frameworks, and MCP clients.</strong>
 </p>
 
+<p align="center">
+  🌐 <a href="https://www.smriti-memcore.com"><strong>www.smriti-memcore.com</strong></a>
+</p>
+
 [![PyPI](https://img.shields.io/pypi/v/smriti-memcore.svg)](https://pypi.org/project/smriti-memcore/)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/website-smriti--memcore.com-c5a059?style=flat&logo=vercel)](https://www.smriti-memcore.com)
 
 <!-- mcp-name: io.github.shivamtyagi18/smriti-memory -->
 
