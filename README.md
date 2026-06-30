@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="figures/logo.png" alt="SMRITI Memcore Logo" width="220" />
-</p>
-
 <h1 align="center">SMRITI Memcore</h1>
 
 <p align="center">
