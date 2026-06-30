@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="figures/logo.jpg" alt="SMRITI Memory Logo" width="600" />
+  <img src="figures/logo.png" alt="SMRITI Memcore Logo" width="120" />
 </p>
 
-# SMRITI Memory
+# SMRITI Memcore
 
 > **Enterprise-grade, privacy-first Long-Term Memory (LTM) engine for LLM agents, multi-agent frameworks, and MCP clients.**
 
