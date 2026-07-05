@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Website](https://img.shields.io/badge/website-smriti--memcore.com-c5a059?style=flat&logo=vercel)](https://www.smriti-memcore.com)
 
-<!-- mcp-name: io.github.shivamtyagi18/smriti-memory -->
+<!-- mcp-name: io.github.smriti-memcore/smriti-memory -->
 
 ---
 

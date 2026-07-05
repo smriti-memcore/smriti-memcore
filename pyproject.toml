@@ -58,9 +58,9 @@ smriti_palace_to_obsidian = "smriti_memcore.palace_to_obsidian:main"
 smriti_install = "smriti_memcore.integrations.install:main"
 
 [project.urls]
-Homepage = "https://github.com/shivamtyagi18/smriti-memcore"
-Repository = "https://github.com/shivamtyagi18/smriti-memcore"
-Issues = "https://github.com/shivamtyagi18/smriti-memcore/issues"
+Homepage = "https://github.com/smriti-memcore/smriti-memcore"
+Repository = "https://github.com/smriti-memcore/smriti-memcore"
+Issues = "https://github.com/smriti-memcore/smriti-memcore/issues"
 Paper = "https://doi.org/10.13140/RG.2.2.25477.82407"
 
 [tool.setuptools.packages.find]

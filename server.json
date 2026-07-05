@@ -1,11 +1,11 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.shivamtyagi18/smriti-memory",
+  "name": "io.github.smriti-memcore/smriti-memory",
   "title": "SMRITI Memory",
   "description": "Neuro-inspired long-term memory for AI agents with semantic graph and consolidation.",
   "version": "1.4.13",
   "repository": {
-    "url": "https://github.com/shivamtyagi18/smriti-memcore",
+    "url": "https://github.com/smriti-memcore/smriti-memcore",
     "source": "github"
   },
   "packages": [
