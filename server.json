@@ -3,7 +3,7 @@
   "name": "io.github.smriti-memcore/smriti-memory",
   "title": "SMRITI Memory",
   "description": "Neuro-inspired long-term memory for AI agents with semantic graph and consolidation.",
-  "version": "1.4.14",
+  "version": "1.4.15",
   "repository": {
     "url": "https://github.com/smriti-memcore/smriti-memcore",
     "source": "github"
@@ -12,7 +12,7 @@
     {
       "registryType": "pypi",
       "identifier": "smriti-memcore",
-      "version": "1.4.14",
+      "version": "1.4.15",
       "transport": {
         "type": "stdio"
       },
