@@ -154,12 +154,24 @@ class EpisodeBuffer:
     @property
     def count(self) -> int:
         """Total number of episodes (including consolidated in DB)."""
+        try:
+            cursor = self._conn.execute("SELECT COUNT(*) FROM episodes")
+            self._total_count = cursor.fetchone()[0]
+        except Exception as e:
+            logger.error(f"Failed to get total episode count: {e}")
         return self._total_count
 
     @property
     def unconsolidated_count(self) -> int:
         """Number of episodes not yet consolidated."""
-        return sum(1 for ep in self._episodes.values() if not ep.consolidated)
+        try:
+            cursor = self._conn.execute(
+                "SELECT COUNT(*) FROM episodes WHERE consolidated = 0"
+            )
+            return cursor.fetchone()[0]
+        except Exception as e:
+            logger.error(f"Failed to get unconsolidated count: {e}")
+            return sum(1 for ep in self._episodes.values() if not ep.consolidated)
 
     # ── Search & Query ───────────────────────────────────
 
@@ -180,6 +192,36 @@ class EpisodeBuffer:
 
     def get_recent(self, n: int = 20) -> List[Episode]:
         """Get the N most recent episodes."""
+        try:
+            cursor = self._conn.execute(
+                "SELECT id, content, timestamp, salience_json, source, trajectory_id, trajectory_step, reflections_json, consolidated, metadata_json FROM episodes ORDER BY timestamp DESC LIMIT ?", (n,)
+            )
+            recent = []
+            for row in cursor:
+                salience_data = json.loads(row[3]) if row[3] else {}
+                ep = Episode(
+                    id=row[0],
+                    content=row[1],
+                    timestamp=datetime.fromisoformat(row[2]),
+                    salience=SalienceScore(
+                        surprise=salience_data.get("surprise", 0),
+                        relevance=salience_data.get("relevance", 0),
+                        emotional=salience_data.get("emotional", 0),
+                        novelty=salience_data.get("novelty", 0),
+                        utility=salience_data.get("utility", 0),
+                    ),
+                    source=MemorySource(row[4]) if row[4] else MemorySource.DIRECT,
+                    trajectory_id=row[5],
+                    trajectory_step=row[6] or 0,
+                    reflections=json.loads(row[7]) if row[7] else [],
+                    consolidated=bool(row[8]),
+                    metadata=json.loads(row[9]) if row[9] else {},
+                )
+                recent.append(ep)
+            return recent
+        except Exception as e:
+            logger.error(f"Failed to query recent episodes: {e}")
+            
         sorted_eps = sorted(
             self._episodes.values(),
             key=lambda e: e.timestamp,
@@ -189,6 +231,47 @@ class EpisodeBuffer:
 
     def get_unconsolidated(self, limit: int = 100) -> List[Episode]:
         """Get unconsolidated episodes for the Consolidation Engine."""
+        try:
+            cursor = self._conn.execute(
+                "SELECT id, content, timestamp, salience_json, source, trajectory_id, trajectory_step, reflections_json, consolidated, metadata_json FROM episodes WHERE consolidated = 0 ORDER BY timestamp"
+            )
+            unconsolidated = []
+            for row in cursor:
+                salience_data = json.loads(row[3]) if row[3] else {}
+                ep = Episode(
+                    id=row[0],
+                    content=row[1],
+                    timestamp=datetime.fromisoformat(row[2]),
+                    salience=SalienceScore(
+                        surprise=salience_data.get("surprise", 0),
+                        relevance=salience_data.get("relevance", 0),
+                        emotional=salience_data.get("emotional", 0),
+                        novelty=salience_data.get("novelty", 0),
+                        utility=salience_data.get("utility", 0),
+                    ),
+                    source=MemorySource(row[4]) if row[4] else MemorySource.DIRECT,
+                    trajectory_id=row[5],
+                    trajectory_step=row[6] or 0,
+                    reflections=json.loads(row[7]) if row[7] else [],
+                    consolidated=bool(row[8]),
+                    metadata=json.loads(row[9]) if row[9] else {},
+                )
+                unconsolidated.append(ep)
+            
+            # Sync in-memory cache
+            with self._lock:
+                current_unconsolidated_ids = {ep.id for ep in unconsolidated}
+                for ep_id in list(self._episodes.keys()):
+                    if ep_id not in current_unconsolidated_ids:
+                        del self._episodes[ep_id]
+                for ep in unconsolidated:
+                    self._episodes[ep.id] = ep
+                    
+            unconsolidated.sort(key=lambda e: e.timestamp)
+            return unconsolidated[:limit]
+        except Exception as e:
+            logger.error(f"Failed to query unconsolidated episodes: {e}")
+            
         unconsolidated = [
             ep for ep in self._episodes.values() if not ep.consolidated
         ]
@@ -197,6 +280,36 @@ class EpisodeBuffer:
 
     def get_by_trajectory(self, trajectory_id: str) -> List[Episode]:
         """Get all episodes in a trajectory sequence."""
+        try:
+            cursor = self._conn.execute(
+                "SELECT id, content, timestamp, salience_json, source, trajectory_id, trajectory_step, reflections_json, consolidated, metadata_json FROM episodes WHERE trajectory_id = ? ORDER BY trajectory_step", (trajectory_id,)
+            )
+            trajectory = []
+            for row in cursor:
+                salience_data = json.loads(row[3]) if row[3] else {}
+                ep = Episode(
+                    id=row[0],
+                    content=row[1],
+                    timestamp=datetime.fromisoformat(row[2]),
+                    salience=SalienceScore(
+                        surprise=salience_data.get("surprise", 0),
+                        relevance=salience_data.get("relevance", 0),
+                        emotional=salience_data.get("emotional", 0),
+                        novelty=salience_data.get("novelty", 0),
+                        utility=salience_data.get("utility", 0),
+                    ),
+                    source=MemorySource(row[4]) if row[4] else MemorySource.DIRECT,
+                    trajectory_id=row[5],
+                    trajectory_step=row[6] or 0,
+                    reflections=json.loads(row[7]) if row[7] else [],
+                    consolidated=bool(row[8]),
+                    metadata=json.loads(row[9]) if row[9] else {},
+                )
+                trajectory.append(ep)
+            return trajectory
+        except Exception as e:
+            logger.error(f"Failed to query trajectory episodes: {e}")
+            
         trajectory = [
             ep for ep in self._episodes.values()
             if ep.trajectory_id == trajectory_id
@@ -221,6 +334,42 @@ class EpisodeBuffer:
 
     def get_high_salience(self, min_composite: float = 0.7, limit: int = 50) -> List[Episode]:
         """Get high-salience episodes."""
+        try:
+            cursor = self._conn.execute(
+                "SELECT id, content, timestamp, salience_json, source, trajectory_id, trajectory_step, reflections_json, consolidated, metadata_json FROM episodes"
+            )
+            high_sal = []
+            for row in cursor:
+                try:
+                    salience_data = json.loads(row[3] or "{}")
+                    composite = salience_data.get("composite", 0.0)
+                except Exception:
+                    composite = 0.0
+                if composite >= min_composite:
+                    ep = Episode(
+                        id=row[0],
+                        content=row[1],
+                        timestamp=datetime.fromisoformat(row[2]),
+                        salience=SalienceScore(
+                            surprise=salience_data.get("surprise", 0),
+                            relevance=salience_data.get("relevance", 0),
+                            emotional=salience_data.get("emotional", 0),
+                            novelty=salience_data.get("novelty", 0),
+                            utility=salience_data.get("utility", 0),
+                        ),
+                        source=MemorySource(row[4]) if row[4] else MemorySource.DIRECT,
+                        trajectory_id=row[5],
+                        trajectory_step=row[6] or 0,
+                        reflections=json.loads(row[7]) if row[7] else [],
+                        consolidated=bool(row[8]),
+                        metadata=json.loads(row[9]) if row[9] else {},
+                    )
+                    high_sal.append(ep)
+            high_sal.sort(key=lambda e: e.salience.composite, reverse=True)
+            return high_sal[:limit]
+        except Exception as e:
+            logger.error(f"Failed to query high salience episodes: {e}")
+            
         high_sal = [
             ep for ep in self._episodes.values()
             if ep.salience.composite >= min_composite

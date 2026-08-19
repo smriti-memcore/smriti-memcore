@@ -352,3 +352,27 @@ def test_get_suggestions_serializable():
     from smriti_memcore.integrations.mcp_server import smriti_get_suggestions
     result = smriti_get_suggestions()
     assert _is_json_serializable(result)
+
+
+def test_smriti_encode_with_force_stores_unconditionally():
+    """smriti_encode with force=True bypasses Attention Gate discard and stores memory."""
+    from smriti_memcore.integrations.mcp_server import smriti_encode
+    result = smriti_encode(content="x", force=True)
+    assert result.get("memory_id") is not None
+    assert result.get("visibility") == "shared"
+
+
+def test_build_smriti_config_embed_model_override(monkeypatch):
+    """SMRITI_EMBED_MODEL overrides embedding_model in build_smriti_config."""
+    monkeypatch.setenv("SMRITI_EMBED_MODEL", "nomic-embed-text")
+    from smriti_memcore.integrations.mcp_server import build_smriti_config
+    config = build_smriti_config()
+    assert config.embedding_model == "nomic-embed-text"
+
+
+def test_mcp_server_mcpserver_instance():
+    """mcp_server is defined as an instance of MCPServer/FastMCP."""
+    from smriti_memcore.integrations.mcp_server import mcp_server
+    assert mcp_server is not None
+    assert hasattr(mcp_server, "tool")
+

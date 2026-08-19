@@ -21,7 +21,10 @@ from typing import Any, Dict, List, Optional
 
 try:
     import mcp
-    from mcp.server.fastmcp import FastMCP
+    try:
+        from mcp.server.fastmcp import FastMCP as MCPServer
+    except ImportError:
+        from mcp.server import MCPServer
 except ImportError:
     raise ImportError(
         "To use the SMRITI MCP server, install the mcp extra:\n"
@@ -50,12 +53,14 @@ def build_smriti_config() -> SmritiConfig:
     SMRITI_STORAGE_PATH  — storage dir, ~ expanded (default: ~/.smriti/global)
     SMRITI_LLM_MODEL     — model name, provider inferred by prefix (default: mistral)
     SMRITI_LLM_API_KEY   — API key for cloud providers (default: "")
+    SMRITI_EMBED_MODEL   — custom embedding model (default: all-MiniLM-L6-v2)
     """
     storage_path = os.path.expanduser(
         os.environ.get("SMRITI_STORAGE_PATH", "~/.smriti/global")
     )
     llm_model = os.environ.get("SMRITI_LLM_MODEL", "mistral")
     api_key = os.environ.get("SMRITI_LLM_API_KEY", "")
+    embed_model = os.environ.get("SMRITI_EMBED_MODEL")
 
     # Infer provider from model name prefix — matches LLMInterface routing in llm_interface.py:61-68
     # IMPORTANT: Pass "" (empty string, not None) for unused provider keys.
@@ -65,20 +70,24 @@ def build_smriti_config() -> SmritiConfig:
     openai_key = api_key if llm_model.startswith("gpt-") else ""
     gemini_key = api_key if llm_model.startswith("gemini") else ""
 
-    return SmritiConfig(
-        storage_path=storage_path,
-        llm_model=llm_model,
-        anthropic_api_key=anthropic_key,
-        openai_api_key=openai_key,
-        gemini_api_key=gemini_key,
-    )
+    kwargs = {
+        "storage_path": storage_path,
+        "llm_model": llm_model,
+        "anthropic_api_key": anthropic_key,
+        "openai_api_key": openai_key,
+        "gemini_api_key": gemini_key,
+    }
+    if embed_model:
+        kwargs["embedding_model"] = embed_model
+
+    return SmritiConfig(**kwargs)
 
 
 # Module-level SMRITI instance — initialized at startup, shared across tool calls.
 # Tests replace this: `import smriti_memcore.integrations.mcp_server as s; s._smriti = test_instance`
 _smriti: Optional[SMRITI] = None
 
-mcp_server = FastMCP(
+mcp_server = MCPServer(
     "smriti-memory",
     instructions=(
         "SMRITI memory system — AMP Full-conformant (amp_version: 1.0). "
@@ -126,10 +135,12 @@ def smriti_encode(
     source: str = "direct",
     modality: str = "text",
     private: bool = False,
+    force: bool = False,
 ) -> Dict[str, Any]:
     """
     Encode information into SMRITI long-term memory.
 
+    force=True bypasses the Attention Gate salience check and unconditionally stores.
     Returns the memory_id if stored, or {"memory_id": null, "status": "discarded"}
     if the Attention Gate determined the content has insufficient salience.
 
@@ -145,9 +156,8 @@ def smriti_encode(
     rather than leaving confident-but-stale claims in the store — recalls treat
     them as truth.
     """
-    try:
-        mem_source = MemorySource(source)
-    except ValueError:
+    mem_source = MemorySource.USER_STATED if force else MemorySource(source) if source in {m.value for m in MemorySource} else None
+    if mem_source is None:
         return {"error": f"Invalid source '{source}'. Use: direct, user_stated, inferred, external"}
     try:
         mem_modality = Modality(modality)
@@ -155,7 +165,7 @@ def smriti_encode(
         return {"error": f"Invalid modality '{modality}'. Use: text, code, image, structured"}
 
     try:
-        memory_id = _smriti.encode(content, source=mem_source, modality=mem_modality)
+        memory_id = _smriti.encode(content, source=mem_source, modality=mem_modality, use_llm=not force, force=force)
         if memory_id is None:
             return {"memory_id": None, "status": "discarded"}
         mem = _smriti.palace.memories.get(memory_id)
@@ -518,7 +528,7 @@ def amp_encode(
         return {"error": f"Invalid source '{source}'", "amp_error_code": "invalid_request"}
 
     try:
-        memory_id = _smriti.encode(content, source=mem_source, use_llm=not force)
+        memory_id = _smriti.encode(content, source=mem_source, use_llm=not force, force=force)
         if memory_id is None:
             return {"status": "below_threshold"}
         mem = _smriti.palace.memories.get(memory_id)

@@ -132,6 +132,7 @@ class SMRITI:
         source: MemorySource = MemorySource.DIRECT,
         modality: Modality = Modality.TEXT,
         use_llm: bool = True,
+        force: bool = False,
     ) -> Optional[str]:
         """
         Encode new information into SMRITI.
@@ -151,7 +152,7 @@ class SMRITI:
             logger.warning(f"Content truncated to {self.config.max_content_length} chars")
 
         # 1. Attention Gate: score salience and decide encoding
-        episode = self.attention_gate.process(content, context, source, use_llm)
+        episode = self.attention_gate.process(content, context, source, use_llm, force=force)
 
         if episode is None:
             self._metrics.encode_discarded.inc()
