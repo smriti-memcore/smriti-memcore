@@ -188,24 +188,36 @@ class AttentionGate:
         context: str = "",
         source: MemorySource = MemorySource.DIRECT,
         use_llm: bool = True,
+        force: bool = False,
     ) -> Optional[Episode]:
         """
         Full processing pipeline: score → decide → create episode.
         
         Returns an Episode if content should be encoded, None if discarded.
+        force=True bypasses salience gate and unconditionally encodes.
         """
-        # Score salience
-        if use_llm:
-            salience = self.score(content, context, source)
+        if force:
+            salience = SalienceScore(
+                surprise=1.0,
+                relevance=1.0,
+                emotional=1.0,
+                novelty=1.0,
+                utility=1.0,
+            )
+            decision = "full"
         else:
-            salience = self.score_fast(content, context, source)
+            # Score salience
+            if use_llm:
+                salience = self.score(content, context, source)
+            else:
+                salience = self.score_fast(content, context, source)
 
-        # Decide encoding level
-        decision = self.should_encode(salience)
+            # Decide encoding level
+            decision = self.should_encode(salience)
 
-        if decision == "discard":
-            logger.debug(f"Discarded (salience={salience.composite:.2f}): {content[:60]}...")
-            return None
+            if decision == "discard":
+                logger.debug(f"Discarded (salience={salience.composite:.2f}): {content[:60]}...")
+                return None
 
         # Create episode
         if decision == "summary" and len(content) > 200:

@@ -309,7 +309,7 @@ class SmritiConfig:
     conflict_threshold: float = 0.7
 
     # Palace
-    room_merge_threshold: float = 0.85      # Similarity above this → merge rooms
+    room_merge_threshold: float = 0.60      # Similarity above this → merge rooms
     room_stale_days: int = 90               # Archive rooms not visited in 90 days
 
     # LLM
@@ -335,15 +335,68 @@ class SmritiConfig:
 
     def __post_init__(self):
         import os
-        self.storage_path = os.path.expanduser(self.storage_path)
+        import json
 
-        # Resolve API keys from environment if not explicitly set
+        # Resolve environment variables that override default constructor fields
+        env_storage_path = os.environ.get("SMRITI_STORAGE_PATH")
+        if env_storage_path and self.storage_path == "~/.smriti/global":
+            self.storage_path = env_storage_path
+
+        env_llm_model = os.environ.get("SMRITI_LLM_MODEL")
+        if env_llm_model and self.llm_model == "mistral":
+            self.llm_model = env_llm_model
+
+        env_embed_model = os.environ.get("SMRITI_EMBED_MODEL")
+        if env_embed_model and self.embedding_model == "all-MiniLM-L6-v2":
+            self.embedding_model = env_embed_model
+
+        # Resolve API keys from environment if not set explicitly in constructor
         if self.openai_api_key is None:
             self.openai_api_key = os.environ.get("OPENAI_API_KEY")
         if self.anthropic_api_key is None:
             self.anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
         if self.gemini_api_key is None:
             self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
+
+        # Load overrides from ~/.smriti/config.json if the user has default/unset values
+        config_path = os.path.expanduser("~/.smriti/config.json")
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r") as f:
+                    config_data = json.load(f)
+                
+                if self.storage_path == "~/.smriti/global" and not env_storage_path:
+                    file_storage = config_data.get("storage_path")
+                    if file_storage:
+                        self.storage_path = file_storage
+                
+                if self.llm_model == "mistral" and not env_llm_model:
+                    file_llm = config_data.get("llm_model")
+                    if file_llm:
+                        self.llm_model = file_llm
+
+                if self.ollama_base_url == "http://localhost:11434":
+                    file_ollama = config_data.get("ollama_base_url")
+                    if file_ollama:
+                        self.ollama_base_url = file_ollama
+
+                if self.openai_api_key is None:
+                    self.openai_api_key = config_data.get("openai_api_key")
+                if self.anthropic_api_key is None:
+                    self.anthropic_api_key = config_data.get("anthropic_api_key")
+                if self.gemini_api_key is None:
+                    self.gemini_api_key = config_data.get("gemini_api_key")
+
+                file_merge_threshold = config_data.get("room_merge_threshold")
+                if file_merge_threshold is not None:
+                    self.room_merge_threshold = float(file_merge_threshold)
+            except Exception:
+                pass
+
+        # Expand storage path
+        self.storage_path = os.path.expanduser(self.storage_path)
+
+
 
         # Validate numeric constraints
         if self.working_memory_slots < 1:

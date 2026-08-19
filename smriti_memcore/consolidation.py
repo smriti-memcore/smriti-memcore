@@ -620,6 +620,7 @@ class ConsolidationEngine:
         del self.palace.rooms[merged.id]
         if merged.id in self.palace._room_embeddings:
             del self.palace._room_embeddings[merged.id]
+        self.palace.vector_store.remove(f"room:{merged.id}")
 
         # Update keeper centroid
         self.palace._update_room_centroid(keeper)

@@ -154,6 +154,7 @@ _HTML = r"""<!DOCTYPE html>
     <div class="hstat"><div class="hstat-val" id="hs-conns">–</div><div class="hstat-label">Connections</div></div>
     <div class="hstat"><div class="hstat-val" id="hs-rooms">–</div><div class="hstat-label">Rooms</div></div>
     <div class="hstat"><div class="hstat-val" id="hs-str">–</div><div class="hstat-label">Avg Strength</div></div>
+    <div class="hstat"><div class="hstat-val" id="hs-pending">0</div><div class="hstat-label">In Queue</div></div>
   </div>
   <div class="hcontrols">
     <button class="cbtn active" id="btn-force" onclick="setLayout('force')">Force</button>
@@ -167,7 +168,15 @@ _HTML = r"""<!DOCTYPE html>
   <div class="tab active" id="tab-graph" onclick="showTab('graph')">🏛️ Semantic Palace</div>
   <div class="tab" id="tab-table" onclick="showTab('table')">📋 Memory Table</div>
   <div class="tab" id="tab-stats" onclick="showTab('stats')">📊 Statistics</div>
-  <div class="tab" id="tab-episodes" onclick="showTab('episodes')">📼 Episode Feed</div>
+  <div class="tab" id="tab-episodes" onclick="showTab('episodes')">📼 Episode Feed <span id="episodes-badge" style="display:none;background:var(--gold);color:#000;border-radius:10px;padding:1px 6px;font-size:9px;margin-left:4px;font-weight:bold;">N</span></div>
+</div>
+
+<div id="consolidation-banner" style="display:none; background: rgba(245,158,11,0.08); border-bottom: 1px solid rgba(245,158,11,0.25); padding: 10px 24px; font-size: 11.5px; align-items: center; justify-content: space-between; color: var(--gold); transition: all 0.3s ease; flex-shrink: 0;">
+  <div style="display: flex; align-items: center; gap: 8px;">
+    <span>⚡</span>
+    <span><strong><span id="banner-count">0</span> new memories</strong> are in the queue for consolidation. Run <code>smriti_consolidate</code> in your terminal or wait for background processing.</span>
+  </div>
+  <button onclick="dismissBanner()" style="background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; font-weight: bold; line-height: 1; padding: 0 4px;">&times;</button>
 </div>
 
 <div class="main">
@@ -260,6 +269,56 @@ let graphData = {nodes:[],edges:[]};
 let simulation, svg, g, linkSel, nodeSel;
 let sortKey = 'strength', sortAsc = false;
 
+function dismissBanner() {
+  document.getElementById('consolidation-banner').style.display = 'none';
+}
+
+async function checkPendingMemories() {
+  try {
+    const res = await fetch('/api/episodes');
+    if (!res.ok) return;
+    const episodes = await res.json();
+    const pendingCount = episodes.filter(ep => !ep.consolidated).length;
+    
+    // Update Pending Stat in Header
+    const pendingValEl = document.getElementById('hs-pending');
+    if (pendingValEl) {
+      pendingValEl.textContent = pendingCount;
+      if (pendingCount > 0) {
+        pendingValEl.style.color = 'var(--gold)';
+        pendingValEl.style.textShadow = '0 0 8px rgba(245,158,11,0.5)';
+      } else {
+        pendingValEl.style.color = 'var(--text)';
+        pendingValEl.style.textShadow = 'none';
+      }
+    }
+    
+    // Update tab badge
+    const badgeEl = document.getElementById('episodes-badge');
+    if (badgeEl) {
+      if (pendingCount > 0) {
+        badgeEl.textContent = pendingCount;
+        badgeEl.style.display = 'inline-block';
+      } else {
+        badgeEl.style.display = 'none';
+      }
+    }
+    
+    // Update Banner
+    const bannerEl = document.getElementById('consolidation-banner');
+    if (bannerEl) {
+      if (pendingCount > 0) {
+        document.getElementById('banner-count').textContent = pendingCount;
+        bannerEl.style.display = 'flex';
+      } else {
+        bannerEl.style.display = 'none';
+      }
+    }
+  } catch (err) {
+    console.error('Failed to check pending memories:', err);
+  }
+}
+
 async function refreshData(){
   episodesLoaded = false;
   const res = await fetch('/api/graph');
@@ -271,6 +330,8 @@ async function refreshData(){
   buildStats(data);
   buildLegend(data);
   buildMemList(data.nodes);
+  
+  await checkPendingMemories();
 }
 
 function updateHeader(data){
