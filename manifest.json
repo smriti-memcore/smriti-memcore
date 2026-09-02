@@ -1,0 +1,31 @@
+{
+  "manifest_version": "0.2",
+  "name": "smriti-memory",
+  "display_name": "Smriti Memory",
+  "version": "1.4.17",
+  "description": "Neuro-inspired long-term memory for AI agents with semantic graph and consolidation.",
+  "author": {
+    "name": "Shivam Tyagi",
+    "email": "shivamtyagi18@gmail.com",
+    "url": "https://github.com/smriti-memcore/smriti-memcore"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smriti-memcore/smriti-memcore"
+  },
+  "license": "MIT",
+  "server": {
+    "type": "python",
+    "entry_point": "smriti_memcore/integrations/mcp_server.py",
+    "mcp_config": {
+      "command": "python",
+      "args": [
+        "-m",
+        "smriti_memcore.integrations.mcp_server"
+      ],
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}

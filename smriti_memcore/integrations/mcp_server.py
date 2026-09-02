@@ -138,7 +138,7 @@ def smriti_encode(
     force: bool = False,
 ) -> Dict[str, Any]:
     """
-    Encode information into SMRITI long-term memory.
+    [Write / State-Modifying] Encode information into SMRITI long-term memory.
 
     force=True bypasses the Attention Gate salience check and unconditionally stores.
     Returns the memory_id if stored, or {"memory_id": null, "status": "discarded"}
@@ -181,7 +181,7 @@ def smriti_encode(
 @mcp_server.tool()
 def smriti_recall(query: str, top_k: int = 10) -> List[Dict[str, Any]]:
     """
-    Recall memories relevant to a query.
+    [Read-Only] Recall memories relevant to a query.
 
     Returns a list of memory dicts, strongest first. Every retrieval strengthens
     the recalled memories (testing effect). Returns empty list if nothing found.
@@ -197,7 +197,7 @@ def smriti_recall(query: str, top_k: int = 10) -> List[Dict[str, Any]]:
 @mcp_server.tool()
 def smriti_get_context() -> Dict[str, str]:
     """
-    Get formatted working memory context for injection into a prompt.
+    [Read-Only] Get formatted working memory context for injection into a prompt.
 
     Returns the current capacity-bounded working memory (7±2 slots) as a
     formatted string ready to prepend to a system prompt or user message.
@@ -214,7 +214,7 @@ def smriti_get_context() -> Dict[str, str]:
 @mcp_server.tool()
 def smriti_how_well_do_i_know(topic: str) -> Dict[str, Any]:
     """
-    Assess confidence about a topic.
+    [Read-Only] Assess confidence about a topic.
 
     Returns 5 confidence dimensions (coverage, freshness, strength, depth, overall)
     and a decision: "recall_confidently", "recall_but_verify", or "admit_gap_and_ask".
@@ -242,7 +242,7 @@ def smriti_how_well_do_i_know(topic: str) -> Dict[str, Any]:
 @mcp_server.tool()
 def smriti_knowledge_gaps() -> List[Dict[str, Any]]:
     """
-    List topics SMRITI knows it doesn't know.
+    [Read-Only] List topics SMRITI knows it doesn't know.
 
     Returns gap dicts with keys: topic, context, discovered_at (ISO string), resolved (bool).
     Gaps are registered when recall returns empty or confidence is below threshold.
@@ -258,7 +258,7 @@ def smriti_knowledge_gaps() -> List[Dict[str, Any]]:
 @mcp_server.tool()
 def smriti_pin(memory_id: str) -> Dict[str, Any]:
     """
-    Mark a memory as permanent — it will never be decayed or forgotten.
+    [Write / State-Modifying] Mark a memory as permanent — it will never be decayed or forgotten.
 
     Returns {"status": "pinned", "memory_id": ...} on success,
     or {"error": ...} if the memory_id is not found.
@@ -280,7 +280,7 @@ def smriti_pin(memory_id: str) -> Dict[str, Any]:
 @mcp_server.tool()
 def smriti_forget(memory_id: str) -> Dict[str, Any]:
     """
-    Gracefully forget a memory by archiving it.
+    [State-Modifying / Archive] Gracefully forget a memory by archiving it.
 
     Sets memory status to ARCHIVED (not deleted — a record remains).
     Returns {"status": "archived", "memory_id": ...} on success,
@@ -299,7 +299,7 @@ def smriti_forget(memory_id: str) -> Dict[str, Any]:
 @mcp_server.tool()
 def smriti_create_private_room(topic: str) -> Dict[str, Any]:
     """
-    Create a private semantic room in the palace.
+    [Write / State-Modifying] Create a private semantic room in the palace.
 
     The room itself is marked private. Use this to organise a topic that should
     never be promoted to team-level consolidation sync. To store a private memory,
@@ -320,7 +320,7 @@ def smriti_create_private_room(topic: str) -> Dict[str, Any]:
 @mcp_server.tool()
 def smriti_consolidate(depth: str = "light") -> Dict[str, Any]:
     """
-    Run a consolidation cycle to organize and strengthen memories.
+    [Write / State-Modifying] Run a consolidation cycle to organize and strengthen memories.
 
     depth="light": chunking + conflict detection only (fast, safe to call often)
     depth="full": all 8 consolidation processes (thorough, use periodically)
@@ -366,7 +366,7 @@ def smriti_consolidate(depth: str = "light") -> Dict[str, Any]:
 @mcp_server.tool()
 def smriti_stats() -> Dict[str, Any]:
     """
-    Get comprehensive SMRITI system statistics.
+    [Read-Only] Get comprehensive SMRITI system statistics.
 
     Returns a nested dict with 8 top-level keys:
     palace, working_memory, retrieval, consolidation, meta_memory,
@@ -392,7 +392,7 @@ def smriti_stats() -> Dict[str, Any]:
 @mcp_server.tool()
 def smriti_get_suggestions() -> List[Dict[str, Any]]:
     """
-    Get proactive suggestions from SMRITI's ambient monitor.
+    [Read-Only] Get proactive suggestions from SMRITI's ambient monitor.
 
     Returns a list of memory dicts — patterns and insights surfaced from
     background consolidation that may be relevant to the current context.
@@ -407,7 +407,7 @@ def smriti_get_suggestions() -> List[Dict[str, Any]]:
 @mcp_server.tool()
 def smriti_open_ui(port: int = 7799) -> Dict[str, Any]:
     """
-    Launch the interactive Memory Browser UI in the user's default web browser.
+    [Side-Effect / Launch UI] Launch the interactive Memory Browser UI in the user's default web browser.
 
     Use this when the user asks to see, visualize, or browse their memories.
     The UI runs locally and provides a visual graph of the Semantic Palace.
@@ -425,7 +425,7 @@ def smriti_open_ui(port: int = 7799) -> Dict[str, Any]:
 @mcp_server.tool()
 def smriti_sync_obsidian(vault_path: str = "") -> Dict[str, Any]:
     """
-    Export the current Semantic Palace to an Obsidian vault.
+    [Write / File Export] Export the current Semantic Palace to an Obsidian vault.
 
     Writes one .md per room + _index.md to vault_path.
     Safe to re-run — overwrites Palace/ cleanly.
@@ -507,7 +507,7 @@ def amp_encode(
     private: bool = False,
 ) -> Dict[str, Any]:
     """
-    Store a new memory for an agent. (AMP Core verb)
+    [Write / State-Modifying] Store a new memory for an agent. (AMP Core verb)
 
     force=True bypasses the salience gate and always stores.
     private=True marks the memory as private (excluded from team consolidation sync).
@@ -548,7 +548,7 @@ def amp_recall(
     top_k: int = 10,
 ) -> Dict[str, Any]:
     """
-    Retrieve memories relevant to a query. (AMP Core verb)
+    [Read-Only] Retrieve memories relevant to a query. (AMP Core verb)
 
     Returns {results: [{id, content, score, timestamp, status}, ...]}.
     Archived memories are excluded by default.
@@ -578,7 +578,7 @@ def amp_forget(
     id: str,
 ) -> Dict[str, Any]:
     """
-    Permanently forget a memory. (AMP Core verb)
+    [State-Modifying / Archive] Permanently forget a memory. (AMP Core verb)
 
     Returns {status: "forgotten"} or {status: "not_found"}.
     """
@@ -597,7 +597,7 @@ def amp_forget(
 @mcp_server.tool(name="amp.stats")
 def amp_stats(agent_id: str) -> Dict[str, Any]:
     """
-    Return backend statistics. (AMP Core verb)
+    [Read-Only] Return backend statistics. (AMP Core verb)
 
     Always includes memory_count (int). May include episode_buffer and retrieval stats.
     """
@@ -619,7 +619,7 @@ def amp_pin(
     id: str,
 ) -> Dict[str, Any]:
     """
-    Mark a memory as permanent — it will never be decayed or archived. (AMP Full verb)
+    [Write / State-Modifying] Mark a memory as permanent — it will never be decayed or archived. (AMP Full verb)
 
     Returns {status: "pinned"} or {status: "not_found"}.
     """
@@ -641,7 +641,7 @@ def amp_consolidate(
     depth: str = "light",
 ) -> Dict[str, Any]:
     """
-    Trigger backend consolidation. (AMP Full verb)
+    [Write / State-Modifying] Trigger backend consolidation. (AMP Full verb)
 
     depth: "light" (fast) or "full" (thorough).
     Returns {status: "ok", memories_processed: int}.

@@ -1,0 +1,9 @@
+# Smithery configuration file for smriti-memcore
+# See https://smithery.ai/docs for schema details
+
+startCommand:
+  type: stdio
+  config:
+    command: uvx
+    args:
+      - smriti-memcore
