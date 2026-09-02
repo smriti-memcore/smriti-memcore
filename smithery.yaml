@@ -3,7 +3,8 @@
 
 startCommand:
   type: stdio
-  config:
-    command: uvx
-    args:
-      - smriti-memcore
+  commandFunction: |-
+    (config) => ({
+      command: 'uvx',
+      args: ['smriti-memcore']
+    })
