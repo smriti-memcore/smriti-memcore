@@ -8,3 +8,14 @@ startCommand:
       command: 'uvx',
       args: ['smriti-memcore']
     })
+
+configSchema:
+  type: object
+  properties:
+    SMRITI_LLM_MODEL:
+      type: string
+      description: "LLM model name for memory operations (default: mistral)"
+      default: "mistral"
+
+exampleConfig:
+  SMRITI_LLM_MODEL: "mistral"
