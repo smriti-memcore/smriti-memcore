@@ -2,49 +2,25 @@ name: Publish to PyPI & MCP Registry
 
 on:
   push:
-    branches: [ "main" ] # Triggers on every push to main
+    tags:
+      - "v*"
+  workflow_dispatch:
 
 jobs:
   publish:
-    # Avoid running on version bump commits created by this workflow
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     permissions:
       id-token: write # Required for OIDC authentication (PyPI trusted publisher + MCP Registry)
-      contents: write # Required to commit, push version bumps, and push tags
+      contents: read
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0 # Fetch all history to push commits/tags properly
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      ### ── Increment Version ─────────────────────────────────────
-
-      - name: Bump version
-        id: version_bump
-        run: |
-          NEW_VERSION=$(python scripts/bump_version.py | grep "Bumped pyproject.toml to" | awk '{print $NF}')
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "New Version: $NEW_VERSION"
-
-      - name: Commit and push version bump
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pyproject.toml server.json
-          git commit -m "Bump version to ${{ steps.version_bump.outputs.version }} [skip ci]"
-          git push origin main
-
-      - name: Tag release
-        run: |
-          git tag v${{ steps.version_bump.outputs.version }}
-          git push origin v${{ steps.version_bump.outputs.version }}
 
       ### ── Build & publish to PyPI ──────────────────────────────
 
