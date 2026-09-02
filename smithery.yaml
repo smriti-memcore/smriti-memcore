@@ -3,6 +3,13 @@
 
 startCommand:
   type: stdio
+  configSchema:
+    type: object
+    properties:
+      SMRITI_LLM_MODEL:
+        type: string
+        description: "LLM model name for memory operations (default: mistral)"
+        default: "mistral"
   commandFunction: |-
     (config) => ({
       command: 'uvx',
