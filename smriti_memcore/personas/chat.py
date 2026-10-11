@@ -33,9 +33,11 @@ def run_persona_chat(persona_id: str = "albert-einstein", model: Optional[str] =
         pass
 
     speaker_label = manifest.author or manifest.name
+    active_model = model or getattr(smriti.llm, "default_model", "mistral")
 
     print(f"\n🎭 Loaded Persona: {manifest.name} ({manifest.era})")
     print(f"📌 Tagline: {manifest.tagline}")
+    print(f"🤖 Active Model: {active_model} (Local Ollama)")
     print(f"🏛️  Rooms: {manifest.total_rooms} rooms | 🧠 Memories: {manifest.total_memories} pinned memories")
     print("\n🏛️  Cognitive Palace Rooms:")
     for r in manifest.core_rooms:
