@@ -1,10 +1,11 @@
 """
-SMRITI Persona Compiler.
-Compiles knowledge specifications (YAML, JSON, or markdown folders) into
-self-contained .smritibundle cognitive artifacts.
+SMRITI Persona Compiler & Multimodal Coursework Ingestion Engine.
+Compiles knowledge specifications (YAML, JSON, or directory trees of PDFs,
+lecture transcripts, and notes) into self-contained .smritibundle cognitive artifacts.
 
-Enables professors, counsellors, and domain experts to distribute their
-cognitive palaces with zero code.
+Enables professors to package an entire course curriculum (slides, transcripts,
+readings, syllabi) into a single downloadable bundle that students can chat with
+24/7 as a Socratic TA.
 """
 
 from __future__ import annotations
@@ -12,25 +13,260 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
 
-def load_spec_file(file_path: Union[str, Path]) -> Dict[str, Any]:
+# ── File and Transcript Extractors ───────────────────────────────────────────
+
+def clean_vtt_or_srt(text: str) -> str:
+    """
+    Cleans WebVTT (.vtt) and SubRip (.srt) video/audio transcripts by
+    stripping timestamps, index counters, and formatting tags.
+    Merges broken speech lines into natural paragraphs.
+    """
+    lines = text.splitlines()
+    cleaned_lines = []
+    # Pattern matching VTT/SRT timing lines like: 00:01:23.456 --> 00:01:28.000
+    timestamp_pattern = re.compile(r"\d{1,2}:\d{2}(?::\d{2})?[.,\d]*\s*-->\s*\d{1,2}:\d{2}(?::\d{2})?[.,\d]*")
+
+    for line in lines:
+        line_s = line.strip()
+        if not line_s:
+            continue
+        if line_s.upper().startswith("WEBVTT") or line_s.upper().startswith("NOTE"):
+            continue
+        if line_s.isdigit():  # Subtitle index number
+            continue
+        if timestamp_pattern.search(line_s):
+            continue
+        # Strip simple HTML styling tags (e.g. <v Speaker>, <i>, </b>)
+        clean = re.sub(r"<[^>]+>", "", line_s)
+        if clean:
+            cleaned_lines.append(clean)
+
+    # Join and group into cohesive paragraphs
+    raw_text = " ".join(cleaned_lines)
+    # Deduplicate excessive whitespace
+    return re.sub(r"\s+", " ", raw_text).strip()
+
+
+def extract_pdf_pages(file_path: Path) -> List[Tuple[int, str]]:
+    """Extracts text per page from a PDF file using pypdf if available."""
+    pages = []
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(str(file_path))
+        for idx, page in enumerate(reader.pages, 1):
+            txt = page.extract_text() or ""
+            txt_clean = re.sub(r"\s+", " ", txt).strip()
+            if txt_clean:
+                pages.append((idx, txt_clean))
+    except Exception as e:
+        logger.warning(f"Could not extract PDF {file_path}: {e}")
+    return pages
+
+
+def extract_notebook_text(file_path: Path) -> str:
+    """Extracts markdown text and key code documentation from a Jupyter Notebook."""
+    try:
+        data = json.loads(file_path.read_text(encoding="utf-8"))
+        chunks = []
+        for cell in data.get("cells", []):
+            cell_type = cell.get("cell_type")
+            source = "".join(cell.get("source", []))
+            if cell_type == "markdown" and source.strip():
+                chunks.append(source.strip())
+            elif cell_type == "code" and source.strip():
+                # Include short code snippets
+                chunks.append(f"```python\n{source.strip()}\n```")
+        return "\n\n".join(chunks)
+    except Exception as e:
+        logger.warning(f"Could not extract notebook {file_path}: {e}")
+        return ""
+
+
+def chunk_text(text: str, max_chars: int = 500) -> List[str]:
+    """Splits text into cohesive chunks around sentence/paragraph boundaries."""
+    if len(text) <= max_chars:
+        return [text] if text.strip() else []
+
+    # Split into sentences
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    chunks = []
+    current_chunk = []
+    current_len = 0
+
+    for s in sentences:
+        s_clean = s.strip()
+        if not s_clean:
+            continue
+        if current_len + len(s_clean) > max_chars and current_chunk:
+            chunks.append(" ".join(current_chunk))
+            current_chunk = [s_clean]
+            current_len = len(s_clean)
+        else:
+            current_chunk.append(s_clean)
+            current_len += len(s_clean) + 1
+
+    if current_chunk:
+        chunks.append(" ".join(current_chunk))
+    return chunks
+
+
+# ── Directory Coursework Ingestion ────────────────────────────────────────────
+
+def parse_coursework_directory(dir_path: Union[str, Path]) -> Dict[str, Any]:
+    """
+    Scans a folder of course materials (PDFs, transcripts, notes, markdown)
+    and constructs a structured Persona Palace specification.
+    """
+    root = Path(dir_path).expanduser().resolve()
+    if not root.exists() or not root.is_dir():
+        raise ValueError(f"Path is not an existing directory: {root}")
+
+    # Check for manifest or course metadata file
+    meta_file = None
+    for name in ["course.yaml", "course.json", "manifest.yaml", "manifest.json", "persona.yaml"]:
+        p = root / name
+        if p.exists():
+            meta_file = p
+            break
+
+    spec = load_spec_file(meta_file) if meta_file else {}
+
+    raw_name = root.name.replace("-", " ").replace("_", " ").title()
+    course_name = spec.get("name") or raw_name
+    course_id = spec.get("id") or root.name.lower().replace(" ", "-").replace("_", "-")
+
+    # Group documents by subdirectory (Rooms)
+    subdirs = [d for d in root.iterdir() if d.is_dir() and not d.name.startswith(".")]
+
+    rooms_data: List[Dict[str, Any]] = []
+
+    if subdirs:
+        # Hierarchical course layout: each folder is a unit/lecture (Room)
+        subdirs.sort(key=lambda d: d.name)
+        for subdir in subdirs:
+            room_topic = subdir.name.replace("-", " ").replace("_", " ").title()
+            room_memories: List[str] = []
+
+            for f in sorted(subdir.rglob("*")):
+                if not f.is_file() or f.name.startswith("."):
+                    continue
+                _ingest_file_into_memories(f, room_memories)
+
+            if room_memories:
+                rooms_data.append({
+                    "topic": room_topic,
+                    "description": f"Curriculum materials from {subdir.name}",
+                    "memories": room_memories,
+                })
+    else:
+        # Flat course layout: group by file or cluster
+        files = [f for f in sorted(root.iterdir()) if f.is_file() and not f.name.startswith(".")]
+        for f in files:
+            if f == meta_file:
+                continue
+            room_topic = f.stem.replace("-", " ").replace("_", " ").title()
+            room_memories: List[str] = []
+            _ingest_file_into_memories(f, room_memories)
+
+            if room_memories:
+                rooms_data.append({
+                    "topic": room_topic,
+                    "description": f"Materials from {f.name}",
+                    "memories": room_memories,
+                })
+
+    # Sequential edges between lectures
+    edges = []
+    for i in range(len(rooms_data) - 1):
+        edges.append({
+            "from_room": rooms_data[i]["topic"],
+            "to_room": rooms_data[i + 1]["topic"],
+            "relation": "builds_on",
+            "weight": 0.85,
+        })
+
+    compiled_spec: Dict[str, Any] = {
+        "id": course_id,
+        "name": course_name,
+        "author": spec.get("author", "Course Instructors"),
+        "version": spec.get("version", "1.0.0"),
+        "era": spec.get("era", "Current Academic Term"),
+        "tagline": spec.get("tagline", f"Interactive Socratic Coursework Palace for {course_name}"),
+        "description": spec.get("description", f"Self-contained 24/7 coursework and office hours memory palace for {course_name}."),
+        "system_prompt_hint": spec.get(
+            "system_prompt_hint",
+            f"You are a warm, rigorous, and supportive Socratic teaching assistant for {course_name}. "
+            f"Help students understand concepts deeply by guiding them with intuition, asking probing "
+            f"questions, and citing the course slides, transcripts, and reading notes stored in your palace.",
+        ),
+        "suggested_prompts": spec.get("suggested_prompts", [
+            f"Can you explain the main concepts introduced in {rooms_data[0]['topic']}?" if rooms_data else "What is the overview of this course?",
+            "What are the most common misconceptions on this topic?",
+            "Can you test my understanding with a challenging question?",
+        ]),
+        "rooms": rooms_data,
+        "edges": edges,
+    }
+    return compiled_spec
+
+
+def _ingest_file_into_memories(file_path: Path, memories: List[str]):
+    """Extracts text chunks from supported document types and appends to memories."""
+    ext = file_path.suffix.lower()
+    fname = file_path.name
+
+    if ext == ".pdf":
+        pages = extract_pdf_pages(file_path)
+        for page_num, text in pages:
+            chunks = chunk_text(text, max_chars=450)
+            for ch in chunks:
+                memories.append(f"[{fname}: Page {page_num}] {ch}")
+
+    elif ext in (".vtt", ".srt"):
+        raw = file_path.read_text(encoding="utf-8", errors="ignore")
+        clean = clean_vtt_or_srt(raw)
+        chunks = chunk_text(clean, max_chars=500)
+        for ch in chunks:
+            memories.append(f"[Lecture Transcript: {fname}] {ch}")
+
+    elif ext == ".ipynb":
+        nb_text = extract_notebook_text(file_path)
+        chunks = chunk_text(nb_text, max_chars=500)
+        for ch in chunks:
+            memories.append(f"[{fname}] {ch}")
+
+    elif ext in (".md", ".txt", ".rst"):
+        raw = file_path.read_text(encoding="utf-8", errors="ignore")
+        chunks = chunk_text(raw, max_chars=500)
+        for ch in chunks:
+            memories.append(f"[{fname}] {ch}")
+
+
+# ── Universal Loader & Compiler ──────────────────────────────────────────────
+
+def load_spec_file(file_path: Optional[Union[str, Path]]) -> Dict[str, Any]:
     """Load specification from a YAML or JSON file."""
+    if not file_path:
+        return {}
     path = Path(file_path).expanduser().resolve()
+    if not path.exists():
+        return {}
     text = path.read_text(encoding="utf-8")
 
     if path.suffix.lower() in (".yaml", ".yml"):
         try:
             import yaml
-            return yaml.safe_load(text)
+            return yaml.safe_load(text) or {}
         except ImportError:
-            # Fallback basic json parser if yaml not installed
             return json.loads(text)
     else:
         return json.loads(text)
@@ -44,15 +280,6 @@ def compile_persona_spec(
 ) -> str:
     """
     Compiles a persona dictionary spec into a .smritibundle archive.
-
-    Args:
-        spec: Dictionary describing the persona, rooms, and memories.
-        output_bundle_path: Target path for the .smritibundle file.
-        install: If True, also installs the compiled bundle into ~/.smriti/personas/.
-        embedding_model: Embedding model for semantic vectors.
-
-    Returns:
-        The canonical path to the generated bundle.
     """
     from smriti_memcore.core import SMRITI
     from smriti_memcore.models import (
@@ -64,7 +291,6 @@ def compile_persona_spec(
         SmritiConfig,
         Visibility,
     )
-    from smriti_memcore.palace import TypedEdge
     from smriti_memcore.personas.bundle import BUNDLE_EXTENSION, export_bundle, import_bundle
     from smriti_memcore.personas.manifest import PersonaManifest
 
@@ -215,3 +441,26 @@ def compile_persona_spec(
         logger.info(f"Installed persona '{persona_id}' into {target_dir}")
 
     return output_bundle_path
+
+
+def compile_path(
+    source_path: Union[str, Path],
+    output_bundle_path: Optional[str] = None,
+    install: bool = False,
+) -> Tuple[str, Dict[str, Any]]:
+    """
+    High-level entry point: compiles either a spec file (YAML/JSON)
+    OR a coursework directory (with PDFs, transcripts, and notes) into a .smritibundle.
+    """
+    path = Path(source_path).expanduser().resolve()
+    if path.is_dir():
+        spec = parse_coursework_directory(path)
+    else:
+        spec = load_spec_file(path)
+
+    out = compile_persona_spec(
+        spec=spec,
+        output_bundle_path=output_bundle_path,
+        install=install,
+    )
+    return out, spec

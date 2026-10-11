@@ -483,12 +483,13 @@ class SMRITI:
         persona_id: str,
         storage_path: Optional[str] = None,
         config: Optional[SmritiConfig] = None,
+        cache_dir: Optional[str] = None,
     ) -> Tuple[SMRITI, Any]:
         """
         Pulls (or loads from cache) a curated persona and instantiates a ready-to-use SMRITI instance.
         """
         from smriti_memcore.personas.hub import pull_persona
-        persona_dir, manifest = pull_persona(persona_id)
+        persona_dir, manifest = pull_persona(persona_id, cache_dir=cache_dir)
         target_path = storage_path or persona_dir
 
         cfg = config or SmritiConfig()

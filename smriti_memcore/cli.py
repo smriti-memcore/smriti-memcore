@@ -140,11 +140,10 @@ def cmd_hook(args: argparse.Namespace):
         if ok:
             print("✓ Git post-commit memory hook uninstalled.")
 def cmd_pack(args: argparse.Namespace):
-    from smriti_memcore.personas.compiler import compile_persona_spec, load_spec_file
+    from smriti_memcore.personas.compiler import compile_path
     print(f"\n📦 Compiling SMRITI Persona Bundle from '{args.spec}'...\n")
-    spec = load_spec_file(args.spec)
-    out_path = compile_persona_spec(
-        spec=spec,
+    out_path, spec = compile_path(
+        source_path=args.spec,
         output_bundle_path=args.output,
         install=args.install,
     )
@@ -157,7 +156,8 @@ def cmd_pack(args: argparse.Namespace):
         print(f"\nYou can now chat with this persona immediately:")
         print(f"  smriti chat {spec.get('id', 'custom')}\n")
     else:
-        print(f"\nBundle ready for distribution! To test locally:")
+        print(f"\nBundle ready for distribution! Students/Users can load it with:")
+        print(f"  smriti pull {out_path}")
         print(f"  smriti chat {spec.get('id', 'custom')}\n")
 
 

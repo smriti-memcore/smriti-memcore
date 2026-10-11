@@ -132,6 +132,17 @@ def pull_persona(
         root = os.path.abspath("data/personas/cache")
         os.makedirs(root, exist_ok=True)
 
+    # 0. Check if persona_id is a direct filepath to a .smritibundle archive or directory
+    if os.path.exists(persona_id) and (persona_id.endswith(BUNDLE_EXTENSION) or os.path.isdir(persona_id)):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            temp_m = import_bundle(persona_id, td)
+            cid = temp_m.id
+        final_dir = os.path.join(root, cid)
+        manifest = import_bundle(persona_id, final_dir)
+        logger.info(f"Imported local bundle '{manifest.name}' into {final_dir}")
+        return final_dir, manifest
+
     target_dir = os.path.join(root, canonical_id)
 
     if not force and os.path.exists(os.path.join(target_dir, MANIFEST_FILENAME)):
