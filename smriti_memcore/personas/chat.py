@@ -46,7 +46,8 @@ def run_persona_chat(persona_id: str = "albert-einstein", model: Optional[str] =
         if not user_input:
             continue
         if user_input.lower() in ("exit", "quit", "q"):
-            print(f"\n{manifest.name}: Farewell, my friend. Never lose a holy curiosity.")
+            farewell = manifest.metadata.get("farewell") or "Farewell, my friend. Thank you for this conversation."
+            print(f"\n{manifest.name}: {farewell}\n")
             break
 
         # 1. Recall relevant memories from the persona's semantic palace
@@ -75,6 +76,16 @@ def run_persona_chat(persona_id: str = "albert-einstein", model: Optional[str] =
                 reply = response.content
             else:
                 reply = str(response)
+
+            reply = reply.strip()
+            # Clean possible prompt echoing from LLM output
+            if reply.startswith(f"User asked: {user_input}"):
+                reply = reply[len(f"User asked: {user_input}"):].strip()
+            if reply.startswith(user_input):
+                reply = reply[len(user_input):].strip()
+            if reply.lower().startswith("respond in character:"):
+                reply = reply[len("respond in character:"):].strip()
+
             print(reply.strip() + "\n")
         except Exception as e:
             # Fallback if no local/remote LLM is running

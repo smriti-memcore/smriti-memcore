@@ -139,8 +139,26 @@ def cmd_hook(args: argparse.Namespace):
         ok = uninstall_git_hook()
         if ok:
             print("✓ Git post-commit memory hook uninstalled.")
-        else:
-            print("· No active hook found to uninstall.")
+def cmd_pack(args: argparse.Namespace):
+    from smriti_memcore.personas.compiler import compile_persona_spec, load_spec_file
+    print(f"\n📦 Compiling SMRITI Persona Bundle from '{args.spec}'...\n")
+    spec = load_spec_file(args.spec)
+    out_path = compile_persona_spec(
+        spec=spec,
+        output_bundle_path=args.output,
+        install=args.install,
+    )
+    print(f"  ✓ Persona Name : {spec.get('name', 'Custom Persona')}")
+    print(f"  ✓ Identifier   : {spec.get('id', 'custom')}")
+    print(f"  ✓ Rooms        : {len(spec.get('rooms', []))}")
+    print(f"  ✓ Output Bundle: {out_path}")
+    if args.install:
+        print(f"  ✓ Auto-installed to ~/.smriti/personas/{spec.get('id', 'custom')}")
+        print(f"\nYou can now chat with this persona immediately:")
+        print(f"  smriti chat {spec.get('id', 'custom')}\n")
+    else:
+        print(f"\nBundle ready for distribution! To test locally:")
+        print(f"  smriti chat {spec.get('id', 'custom')}\n")
 
 
 def cmd_stats(args: argparse.Namespace):
@@ -226,7 +244,14 @@ def main(argv: Optional[List[str]] = None):
     p_hook.add_argument("action", choices=["install", "uninstall"], help="Action to perform")
     p_hook.set_defaults(func=cmd_hook)
 
-    # 9. stats
+    # 9. pack
+    p_pack = subparsers.add_parser("pack", help="Compile a knowledge specification (YAML/JSON) into a .smritibundle")
+    p_pack.add_argument("spec", help="Path to persona specification file (e.g. course.yaml, mentor.json)")
+    p_pack.add_argument("--output", "-o", default=None, help="Output .smritibundle file path")
+    p_pack.add_argument("--install", "-i", action="store_true", help="Automatically install compiled persona to local cache")
+    p_pack.set_defaults(func=cmd_pack)
+
+    # 10. stats
     p_stats = subparsers.add_parser("stats", help="Display local memory palace and vector store statistics")
     p_stats.set_defaults(func=cmd_stats)
 

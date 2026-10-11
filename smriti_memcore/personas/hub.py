@@ -42,6 +42,16 @@ OFFICIAL_REGISTRY: Dict[str, Dict[str, str]] = {
         "description": "Philosophical memory palace of Marcus Aurelius (Meditations, Stoic ethics, Duty, Mortality)",
         "download_url": "https://github.com/smriti-memcore/smriti-memcore/releases/download/v1.4.26/marcus-aurelius.smritibundle",
     },
+    "prof-systems": {
+        "name": "Prof. Alex Chen",
+        "description": "24/7 Socratic Office Hours companion for Distributed Systems, Consensus, and Storage Engines",
+        "download_url": "https://github.com/smriti-memcore/smriti-memcore/releases/download/v1.4.26/prof-systems.smritibundle",
+    },
+    "mindful-counsellor": {
+        "name": "Dr. Clara Vance",
+        "description": "100% private, empathetic CBT & mindfulness companion for grounding, anxiety reframing, and calm",
+        "download_url": "https://github.com/smriti-memcore/smriti-memcore/releases/download/v1.4.26/mindful-counsellor.smritibundle",
+    },
 }
 
 
@@ -106,6 +116,12 @@ def pull_persona(
         "newton": "isaac-newton",
         "marcus": "marcus-aurelius",
         "aurelius": "marcus-aurelius",
+        "prof": "prof-systems",
+        "systems": "prof-systems",
+        "counsellor": "mindful-counsellor",
+        "counselor": "mindful-counsellor",
+        "mindful": "mindful-counsellor",
+        "clara": "mindful-counsellor",
     }
     canonical_id = aliases.get(normalized_id, normalized_id)
 
@@ -158,6 +174,8 @@ def _find_local_candidate_bundle(persona_id: str) -> Optional[str]:
         f"data/personas/{persona_id}",
         f"curation/{persona_id}/{persona_id}{BUNDLE_EXTENSION}",
         f"curation/{persona_id}",
+        f"curation/{persona_id.replace('-', '_')}/{persona_id}{BUNDLE_EXTENSION}",
+        f"curation/{persona_id.replace('-', '_')}",
         f"{persona_id}{BUNDLE_EXTENSION}",
     ]
     for p in search_paths:

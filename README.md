@@ -86,24 +86,27 @@ Inspired by human Dual-Process cognitive theory, SMRITI splits memory operations
 
 ## 🏁 Quick Start
 
-### 1. Unified SMRITI CLI & Persona Hub
+### 1. Unified SMRITI CLI & Living Mentors Hub
 
-The fastest way to experience SMRITI is through the unified `smriti` command-line tool:
+Experience pre-curated cognitive mentors or compile your own domain memory palaces (.smritibundle) for education, therapy, or engineering:
 
 ```bash
 pip install smriti-memcore
 
-# List official registry and installed memory personas
+# 1. Browse available cognitive personas (Professors, Counsellors, Historical Thinkers)
 smriti list
 
-# Pull a pre-curated cognitive memory palace on-demand (e.g. Albert Einstein)
-smriti pull einstein
+# 2. Chat with a 24/7 Socratic Distributed Systems Professor
+smriti chat prof-systems
 
-# Start an interactive conversation with the persona
+# 3. Chat with a 100% private, local CBT & Mindfulness Counsellor
+smriti chat mindful-counsellor
+
+# 4. Chat with Albert Einstein
 smriti chat einstein
 
-# Launch the visual D3.js memory graph in your browser
-smriti ui
+# 5. Compile your own course or counseling persona into a distributable .smritibundle
+smriti pack ./my-course.yaml --install
 ```
 
 ---

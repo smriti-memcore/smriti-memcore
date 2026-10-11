@@ -288,7 +288,7 @@ class SemanticPalace:
 
             # Search within entry room (hop=0)
             for mem in self.get_room_memories(room.id):
-                if mem.embedding:
+                if mem.embedding is not None:
                     score = float(np.dot(query_embedding, np.array(mem.embedding)))
                     if mem.id not in candidates or score > candidates[mem.id][1]:
                         candidates[mem.id] = (mem, score, 0)
@@ -300,7 +300,7 @@ class SemanticPalace:
                     neighbor.last_visited = datetime.now()
 
                     for mem in self.get_room_memories(neighbor.id):
-                        if mem.embedding:
+                        if mem.embedding is not None:
                             score = float(np.dot(query_embedding, np.array(mem.embedding)))
                             # Discount neighbor scores slightly
                             score *= 0.85 * edge.strength
@@ -330,7 +330,7 @@ class SemanticPalace:
         for mem in self.memories.values():
             if mem.status not in (MemoryStatus.ACTIVE, MemoryStatus.PINNED) or mem.strength < min_strength:
                 continue
-            if mem.embedding:
+            if mem.embedding is not None:
                 score = float(np.dot(query_embedding, np.array(mem.embedding)))
                 if score > 0.4:
                     mem.retrieval_score = score
@@ -368,7 +368,7 @@ class SemanticPalace:
         embeddings = []
         for mid in room.memory_ids:
             mem = self.memories.get(mid)
-            if mem and mem.embedding:
+            if mem and mem.embedding is not None:
                 embeddings.append(np.array(mem.embedding))
         
         if embeddings:
