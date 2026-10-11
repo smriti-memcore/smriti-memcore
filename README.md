@@ -108,20 +108,31 @@ smriti ui
 
 ---
 
-### 2. Unified MCP Server (Claude Code, Gemini, Codex)
+### 2. Smriti DevBrain: Universal Developer Memory (Cursor, Claude, Windsurf, Gemini, Zed)
 
-SMRITI can be used as a global, persistent memory layer across all your MCP-enabled developer clients.
+SMRITI solves cross-agent amnesia by acting as a shared, local cognitive brain across all your AI coding tools. A bug solved in Claude Code or Gemini is immediately remembered by Cursor.
 
-#### Method A: One-Line Installer (Recommended)
-Run the setup script directly in your terminal:
+#### Step 1: Auto-Configure All Installed IDEs & Agents
+Run one command to scan and configure Cursor, Claude Code, Windsurf, Gemini, and Zed in seconds:
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/smriti-memcore/smriti-memcore/main/install_smriti_mcp.sh)
-```
-
-#### Method B: Via CLI
-```bash
-pip3 install smriti-memcore
 smriti install
+```
+*(Or target specific tools: `smriti install --client cursor,windsurf`)*
+
+#### Step 2: Initialize a Codebase Workspace
+Inside any repository, run:
+```bash
+smriti init
+```
+This automatically:
+- Creates a dedicated Semantic Room in the Palace for the project (`repo:<name>`).
+- Scaffolds `.cursorrules`, `.cursor/rules/smriti.mdc`, `CLAUDE.md`, and project `.cursor/mcp.json`.
+- Installs a lightweight, non-blocking git `post-commit` hook that records recent commits and architectural changes into memory.
+
+#### Git Commit Memory Hook Management:
+```bash
+smriti hook install    # Enable automatic commit context logging
+smriti hook uninstall  # Remove the post-commit hook
 ```
 
 ---

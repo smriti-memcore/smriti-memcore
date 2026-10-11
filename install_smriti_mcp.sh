@@ -317,7 +317,161 @@ RULEEOF
     fi
 fi
 
-# ── 6. Smoke test ─────────────────────────────────────────────────────────────
+# ── 5c. Patch Cursor IDE config (if detected) ─────────────────────────────────
+
+CURSOR_DIR="$HOME/.cursor"
+CURSOR_APP_DIR="$HOME/Library/Application Support/Cursor"
+if [[ -d "$CURSOR_DIR" ]] || [[ -d "$CURSOR_APP_DIR" ]]; then
+    echo ""
+    read -rp "Cursor IDE detected — register smriti-memory there? [Y/n]: " CONFIGURE_CURSOR
+    CONFIGURE_CURSOR="${CONFIGURE_CURSOR:-Y}"
+
+    if [[ "$CONFIGURE_CURSOR" =~ ^[Yy]$ ]]; then
+        info "Registering smriti-memory MCP server in Cursor configs..."
+        ABS_STORAGE_PATH="${STORAGE_PATH/#\~/$HOME}"
+        ABS_OBSIDIAN_PATH="${OBSIDIAN_PATH/#\~/$HOME}"
+
+        "$PYTHON" - <<PYEOF
+import json, os
+
+def patch_cursor(filepath):
+    filepath = os.path.expanduser(filepath)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    try:
+        with open(filepath) as f:
+            cfg = json.load(f)
+    except Exception:
+        cfg = {}
+    servers = cfg.setdefault("mcpServers", {})
+    env = {
+        "PYTHONPATH": "",
+        "SMRITI_STORAGE_PATH": "$ABS_STORAGE_PATH",
+        "SMRITI_LLM_MODEL": "$LLM_MODEL",
+        "SMRITI_LLM_API_KEY": "$LLM_API_KEY",
+    }
+    obsidian_path = "$ABS_OBSIDIAN_PATH".strip()
+    if obsidian_path:
+        env["SMRITI_OBSIDIAN_PATH"] = obsidian_path
+
+    servers["smriti-memory"] = {
+        "command": "$PYTHON",
+        "args": ["-m", "smriti_memcore.integrations.mcp_server"],
+        "env": env,
+    }
+    with open(filepath, "w") as f:
+        json.dump(cfg, f, indent=2)
+    print(f"[smriti] ✓ Written to {filepath}")
+
+patch_cursor("~/.cursor/mcp.json")
+
+# Cursorrules
+cr_path = os.path.expanduser("~/.cursorrules")
+if not os.path.exists(cr_path):
+    with open(cr_path, "w") as f:
+        f.write("# SMRITI Persistent Memory for Cursor\nAlways call smriti_recall with keywords before writing code.\nCall smriti_encode when resolving issues or recording conventions.\n")
+    print(f"[smriti] ✓ Written to {cr_path}")
+PYEOF
+        success "Cursor configured successfully"
+    fi
+fi
+
+# ── 5d. Patch Windsurf / Cascade config (if detected) ─────────────────────────
+
+WINDSURF_DIR="$HOME/.codeium/windsurf"
+if [[ -d "$WINDSURF_DIR" ]]; then
+    echo ""
+    read -rp "Windsurf detected — register smriti-memory there? [Y/n]: " CONFIGURE_WINDSURF
+    CONFIGURE_WINDSURF="${CONFIGURE_WINDSURF:-Y}"
+
+    if [[ "$CONFIGURE_WINDSURF" =~ ^[Yy]$ ]]; then
+        info "Registering smriti-memory MCP server in Windsurf..."
+        ABS_STORAGE_PATH="${STORAGE_PATH/#\~/$HOME}"
+        ABS_OBSIDIAN_PATH="${OBSIDIAN_PATH/#\~/$HOME}"
+
+        "$PYTHON" - <<PYEOF
+import json, os
+filepath = os.path.expanduser("~/.codeium/windsurf/mcp_config.json")
+os.makedirs(os.path.dirname(filepath), exist_ok=True)
+try:
+    with open(filepath) as f:
+        cfg = json.load(f)
+except Exception:
+    cfg = {}
+servers = cfg.setdefault("mcpServers", {})
+env = {
+    "PYTHONPATH": "",
+    "SMRITI_STORAGE_PATH": "$ABS_STORAGE_PATH",
+    "SMRITI_LLM_MODEL": "$LLM_MODEL",
+    "SMRITI_LLM_API_KEY": "$LLM_API_KEY",
+}
+obsidian_path = "$ABS_OBSIDIAN_PATH".strip()
+if obsidian_path:
+    env["SMRITI_OBSIDIAN_PATH"] = obsidian_path
+
+servers["smriti-memory"] = {
+    "command": "$PYTHON",
+    "args": ["-m", "smriti_memcore.integrations.mcp_server"],
+    "env": env,
+}
+with open(filepath, "w") as f:
+    json.dump(cfg, f, indent=2)
+print(f"[smriti] ✓ Written to {filepath}")
+PYEOF
+        success "Windsurf configured successfully"
+    fi
+fi
+
+# ── 5e. Patch Continue.dev config (if detected) ───────────────────────────────
+
+CONTINUE_DIR="$HOME/.continue"
+if [[ -d "$CONTINUE_DIR" ]]; then
+    echo ""
+    read -rp "Continue.dev detected — register smriti-memory there? [Y/n]: " CONFIGURE_CONTINUE
+    CONFIGURE_CONTINUE="${CONFIGURE_CONTINUE:-Y}"
+
+    if [[ "$CONFIGURE_CONTINUE" =~ ^[Yy]$ ]]; then
+        info "Registering smriti-memory MCP server in Continue.dev..."
+        ABS_STORAGE_PATH="${STORAGE_PATH/#\~/$HOME}"
+        ABS_OBSIDIAN_PATH="${OBSIDIAN_PATH/#\~/$HOME}"
+
+        "$PYTHON" - <<PYEOF
+import json, os
+filepath = os.path.expanduser("~/.continue/config.json")
+if os.path.exists(filepath):
+    try:
+        with open(filepath) as f:
+            cfg = json.load(f)
+    except Exception:
+        cfg = {}
+    exp = cfg.setdefault("experimental", {})
+    mcps = exp.setdefault("modelContextProtocolServers", [])
+    already = any(s.get("name") == "smriti-memory" for s in mcps if isinstance(s, dict))
+    if not already:
+        env = {
+            "PYTHONPATH": "",
+            "SMRITI_STORAGE_PATH": "$ABS_STORAGE_PATH",
+            "SMRITI_LLM_MODEL": "$LLM_MODEL",
+            "SMRITI_LLM_API_KEY": "$LLM_API_KEY",
+        }
+        obsidian_path = "$ABS_OBSIDIAN_PATH".strip()
+        if obsidian_path:
+            env["SMRITI_OBSIDIAN_PATH"] = obsidian_path
+        mcps.append({
+            "name": "smriti-memory",
+            "transport": {
+                "type": "stdio",
+                "command": "$PYTHON",
+                "args": ["-m", "smriti_memcore.integrations.mcp_server"],
+                "env": env,
+            }
+        })
+        with open(filepath, "w") as f:
+            json.dump(cfg, f, indent=2)
+        print(f"[smriti] ✓ Written to {filepath}")
+PYEOF
+        success "Continue.dev configured successfully"
+    fi
+fi
 
 info "Verifying server starts..."
 if "$PYTHON" -c "
