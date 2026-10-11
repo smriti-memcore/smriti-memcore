@@ -441,6 +441,61 @@ class SMRITI:
         self.close()
         return False
 
+    def export_bundle(
+        self,
+        output_path: str,
+        manifest: Optional[Any] = None,
+    ) -> str:
+        """
+        Exports this SMRITI instance into a portable .smritibundle or directory.
+        """
+        from smriti_memcore.personas.bundle import export_bundle as _export_bundle
+        from smriti_memcore.personas.manifest import PersonaManifest
+
+        if manifest is None:
+            manifest = PersonaManifest(
+                id="custom-persona",
+                name="Custom Persona",
+                description="Exported SMRITI memory palace",
+            )
+        return _export_bundle(self, manifest, output_path)
+
+    @classmethod
+    def from_bundle(
+        cls,
+        bundle_path: str,
+        storage_path: str,
+        config: Optional[SmritiConfig] = None,
+    ) -> Tuple[SMRITI, Any]:
+        """
+        Unpacks a .smritibundle into storage_path and instantiates a SMRITI instance.
+        """
+        from smriti_memcore.personas.bundle import import_bundle as _import_bundle
+        manifest = _import_bundle(bundle_path, storage_path)
+        cfg = config or SmritiConfig()
+        cfg.storage_path = storage_path
+        instance = cls(config=cfg)
+        return instance, manifest
+
+    @classmethod
+    def from_persona(
+        cls,
+        persona_id: str,
+        storage_path: Optional[str] = None,
+        config: Optional[SmritiConfig] = None,
+    ) -> Tuple[SMRITI, Any]:
+        """
+        Pulls (or loads from cache) a curated persona and instantiates a ready-to-use SMRITI instance.
+        """
+        from smriti_memcore.personas.hub import pull_persona
+        persona_dir, manifest = pull_persona(persona_id)
+        target_path = storage_path or persona_dir
+
+        cfg = config or SmritiConfig()
+        cfg.storage_path = target_path
+        instance = cls(config=cfg)
+        return instance, manifest
+
     def __repr__(self) -> str:
         h = self.palace.health()
         return (

@@ -210,13 +210,13 @@ class SemanticPalace:
         return self.memories.get(memory_id)
 
     def get_room_memories(self, room_id: str) -> List[Memory]:
-        """Get all active memories in a room."""
+        """Get all active or pinned memories in a room."""
         room = self.rooms.get(room_id)
         if not room:
             return []
         return [
             self.memories[mid] for mid in room.memory_ids
-            if mid in self.memories and self.memories[mid].status == MemoryStatus.ACTIVE
+            if mid in self.memories and self.memories[mid].status in (MemoryStatus.ACTIVE, MemoryStatus.PINNED)
         ]
 
     # ── Edge (Hallway) Management ────────────────────────
@@ -328,7 +328,7 @@ class SemanticPalace:
         """Search across all rooms — used by Ambient Monitor."""
         candidates = []
         for mem in self.memories.values():
-            if mem.status != MemoryStatus.ACTIVE or mem.strength < min_strength:
+            if mem.status not in (MemoryStatus.ACTIVE, MemoryStatus.PINNED) or mem.strength < min_strength:
                 continue
             if mem.embedding:
                 score = float(np.dot(query_embedding, np.array(mem.embedding)))

@@ -65,3 +65,7 @@ langchain_smriti_db/
 # MCP server config (machine-specific paths — create from .mcp.json.example)
 .mcp.json
 .superpowers/
+.smriti_ide_db/
+.supermemory/
+demo_memory/
+*.mcpb

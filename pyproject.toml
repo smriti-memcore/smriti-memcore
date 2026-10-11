@@ -53,9 +53,11 @@ mcp = [
 ]
 
 [project.scripts]
+smriti = "smriti_memcore.cli:main"
 smriti_ui = "smriti_memcore.ui.__main__:main"
 smriti_palace_to_obsidian = "smriti_memcore.palace_to_obsidian:main"
 smriti_install = "smriti_memcore.integrations.install:main"
+smriti_chat = "smriti_memcore.personas.chat:main"
 
 [project.urls]
 Homepage = "https://github.com/smriti-memcore/smriti-memcore"
