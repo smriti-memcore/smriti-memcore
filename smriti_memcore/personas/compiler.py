@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
+logging.getLogger("pypdf").setLevel(logging.ERROR)
 
 
 # ── File and Transcript Extractors ───────────────────────────────────────────
@@ -63,10 +64,13 @@ def extract_pdf_pages(file_path: Path) -> List[Tuple[int, str]]:
         from pypdf import PdfReader
         reader = PdfReader(str(file_path))
         for idx, page in enumerate(reader.pages, 1):
-            txt = page.extract_text() or ""
-            txt_clean = re.sub(r"\s+", " ", txt).strip()
-            if txt_clean:
-                pages.append((idx, txt_clean))
+            raw = page.extract_text() or ""
+            # Handle surrogates and clean whitespace safely
+            clean = raw.encode("utf-8", errors="ignore").decode("utf-8", errors="ignore")
+            clean = re.sub(r"\s+", " ", clean).strip()
+            # Filter out near-empty slide title pages (< 50 chars)
+            if len(clean) >= 50:
+                pages.append((idx, clean))
     except Exception as e:
         logger.warning(f"Could not extract PDF {file_path}: {e}")
     return pages
@@ -121,6 +125,16 @@ def chunk_text(text: str, max_chars: int = 500) -> List[str]:
 
 # ── Directory Coursework Ingestion ────────────────────────────────────────────
 
+def normalize_lecture_key(key: str) -> str:
+    """Normalizes lecture labels like Lecture 1, lec01 -> Lecture 01."""
+    m = re.match(r"Lecture\s+(\d+)([a-zA-Z]?)", key, re.IGNORECASE)
+    if m:
+        num = int(m.group(1))
+        suffix = m.group(2).upper()
+        return f"Lecture {num:02d}{suffix}".strip()
+    return key
+
+
 def parse_coursework_directory(dir_path: Union[str, Path]) -> Dict[str, Any]:
     """
     Scans a folder of course materials (PDFs, transcripts, notes, markdown)
@@ -130,59 +144,123 @@ def parse_coursework_directory(dir_path: Union[str, Path]) -> Dict[str, Any]:
     if not root.exists() or not root.is_dir():
         raise ValueError(f"Path is not an existing directory: {root}")
 
-    # Check for manifest or course metadata file
+    # Check for course metadata (data.json, course.yaml, manifest.json)
     meta_file = None
-    for name in ["course.yaml", "course.json", "manifest.yaml", "manifest.json", "persona.yaml"]:
+    for name in ["data.json", "course.yaml", "course.json", "manifest.yaml", "manifest.json"]:
         p = root / name
         if p.exists():
             meta_file = p
             break
+        # Also check immediate subfolders (e.g. 15.773-spring-2024/data.json)
+        subs = list(root.glob(f"*/{name}"))
+        if subs:
+            meta_file = subs[0]
+            break
 
-    spec = load_spec_file(meta_file) if meta_file else {}
+    raw_meta = load_spec_file(meta_file) if meta_file else {}
 
-    raw_name = root.name.replace("-", " ").replace("_", " ").title()
-    course_name = spec.get("name") or raw_name
-    course_id = spec.get("id") or root.name.lower().replace(" ", "-").replace("_", "-")
+    # Build file-to-title map from any data.json metadata in course tree (MIT OCW style)
+    file_to_title: Dict[str, str] = {}
+    for jf in root.rglob("data.json"):
+        try:
+            jdata = json.loads(jf.read_text(encoding="utf-8", errors="ignore"))
+            title = jdata.get("title")
+            if not title:
+                continue
+            for key in ["captions_file", "transcript_file", "file"]:
+                target = jdata.get(key)
+                if target:
+                    fname = Path(target).name
+                    file_to_title[fname] = title
+        except Exception:
+            pass
 
-    # Group documents by subdirectory (Rooms)
-    subdirs = [d for d in root.iterdir() if d.is_dir() and not d.name.startswith(".")]
+    # Extract metadata (with MIT OCW / academic portal support)
+    course_name = raw_meta.get("course_title") or raw_meta.get("name") or root.name.replace("-", " ").replace("_", " ").title()
+    course_id = raw_meta.get("id")
+    if not course_id:
+        if raw_meta.get("primary_course_number"):
+            course_id = f"mit-{raw_meta['primary_course_number'].lower().replace('.', '-')}"
+        elif raw_meta.get("course_title"):
+            course_id = re.sub(r"[^a-z0-9]+", "-", raw_meta["course_title"].lower()).strip("-")
+        else:
+            course_id = root.name.lower().replace(" ", "-").replace("_", "-")
+    
+    author = "Course Instructors"
+    if "instructors" in raw_meta and isinstance(raw_meta["instructors"], list) and raw_meta["instructors"]:
+        first_inst = raw_meta["instructors"][0]
+        if isinstance(first_inst, dict):
+            author = first_inst.get("title") or f"{first_inst.get('first_name', '')} {first_inst.get('last_name', '')}".strip()
+    elif raw_meta.get("author"):
+        author = raw_meta["author"]
+
+    course_desc = raw_meta.get("course_description") or raw_meta.get("description") or f"Coursework and office hours palace for {course_name}."
+
+    # Scan for course files
+    supported_exts = {".pdf", ".webvtt", ".vtt", ".srt", ".md", ".txt", ".ipynb"}
+    ignored_names = {"robots.txt", "sitemap.xml", "favicon.ico", "license.txt", ".ds_store", "content_map.json"}
+    files_to_ingest = []
+    seen_signatures = set()
+
+    for f in sorted(root.rglob("*")):
+        if not f.is_file() or f.name.startswith(".") or f.name.lower() in ignored_names:
+            continue
+        if f.suffix.lower() not in supported_exts:
+            continue
+        # Skip build/cache assets
+        if any(part in f.parts for part in ("node_modules", ".git", ".smriti")):
+            continue
+        # Deduplicate identical files across root and subfolders
+        sig = (f.name, f.stat().st_size)
+        if sig in seen_signatures:
+            continue
+        seen_signatures.add(sig)
+        files_to_ingest.append(f)
+
+    # Group files into Rooms (by lecture pattern, title mapping, or subfolder)
+    grouped_rooms: Dict[str, List[Path]] = {}
+
+    def _determine_room_topic(f: Path) -> str:
+        title = file_to_title.get(f.name) or file_to_title.get(f.name.lower()) or ""
+        targets = [title, f.name] if title else [f.name]
+        for text in targets:
+            m = re.search(r"(?:lec(?:ture)?)[-_:\s]?([0-9]{1,3}[a-zA-Z]|[0-9]{1,3}\.[0-9]+|[0-9]{1,3})", text, re.IGNORECASE)
+            if m:
+                val = m.group(1)
+                if "." in val:
+                    return f"Lecture {val}"
+                num_part = re.sub(r"[a-zA-Z]", "", val)
+                alpha_part = re.sub(r"[0-9]", "", val).upper()
+                if num_part:
+                    return f"Lecture {int(num_part):02d}{alpha_part}"
+                return f"Lecture {val}"
+            m2 = re.match(r"^\s*([0-9]{1,3}):\s*", text)
+            if m2:
+                num = int(m2.group(1))
+                return f"Lecture {num:02d}"
+
+        parent_name = f.parent.name
+        if parent_name and parent_name not in (root.name, "resources", "static_resources", "download"):
+            return parent_name.replace("-", " ").replace("_", " ").title()
+        return f.stem.replace("-", " ").replace("_", " ").title()
+
+    for f in files_to_ingest:
+        room_topic = _determine_room_topic(f)
+        grouped_rooms.setdefault(room_topic, []).append(f)
 
     rooms_data: List[Dict[str, Any]] = []
 
-    if subdirs:
-        # Hierarchical course layout: each folder is a unit/lecture (Room)
-        subdirs.sort(key=lambda d: d.name)
-        for subdir in subdirs:
-            room_topic = subdir.name.replace("-", " ").replace("_", " ").title()
-            room_memories: List[str] = []
-
-            for f in sorted(subdir.rglob("*")):
-                if not f.is_file() or f.name.startswith("."):
-                    continue
-                _ingest_file_into_memories(f, room_memories)
-
-            if room_memories:
-                rooms_data.append({
-                    "topic": room_topic,
-                    "description": f"Curriculum materials from {subdir.name}",
-                    "memories": room_memories,
-                })
-    else:
-        # Flat course layout: group by file or cluster
-        files = [f for f in sorted(root.iterdir()) if f.is_file() and not f.name.startswith(".")]
-        for f in files:
-            if f == meta_file:
-                continue
-            room_topic = f.stem.replace("-", " ").replace("_", " ").title()
-            room_memories: List[str] = []
+    for room_topic, flist in sorted(grouped_rooms.items()):
+        room_memories: List[str] = []
+        for f in flist:
             _ingest_file_into_memories(f, room_memories)
 
-            if room_memories:
-                rooms_data.append({
-                    "topic": room_topic,
-                    "description": f"Materials from {f.name}",
-                    "memories": room_memories,
-                })
+        if room_memories:
+            rooms_data.append({
+                "topic": room_topic,
+                "description": f"Curriculum materials for {room_topic}",
+                "memories": room_memories,
+            })
 
     # Sequential edges between lectures
     edges = []
@@ -197,22 +275,23 @@ def parse_coursework_directory(dir_path: Union[str, Path]) -> Dict[str, Any]:
     compiled_spec: Dict[str, Any] = {
         "id": course_id,
         "name": course_name,
-        "author": spec.get("author", "Course Instructors"),
-        "version": spec.get("version", "1.0.0"),
-        "era": spec.get("era", "Current Academic Term"),
-        "tagline": spec.get("tagline", f"Interactive Socratic Coursework Palace for {course_name}"),
-        "description": spec.get("description", f"Self-contained 24/7 coursework and office hours memory palace for {course_name}."),
-        "system_prompt_hint": spec.get(
-            "system_prompt_hint",
-            f"You are a warm, rigorous, and supportive Socratic teaching assistant for {course_name}. "
-            f"Help students understand concepts deeply by guiding them with intuition, asking probing "
-            f"questions, and citing the course slides, transcripts, and reading notes stored in your palace.",
+        "author": author,
+        "version": raw_meta.get("version", "1.0.0"),
+        "era": raw_meta.get("term", raw_meta.get("era", "Current Term")),
+        "tagline": f"Interactive Socratic Coursework Palace for {course_name}",
+        "description": course_desc,
+        "system_prompt_hint": (
+            f"You are {author}, teaching {course_name}. "
+            f"Adopt a supportive, rigorous, and Socratic pedagogical approach: validate the student's curiosity, "
+            f"guide them toward first principles using practical intuition, and ask probing questions that "
+            f"lead them to discover the answer. Ground your explanations directly in the lecture slides and transcripts stored in your palace."
         ),
-        "suggested_prompts": spec.get("suggested_prompts", [
-            f"Can you explain the main concepts introduced in {rooms_data[0]['topic']}?" if rooms_data else "What is the overview of this course?",
-            "What are the most common misconceptions on this topic?",
-            "Can you test my understanding with a challenging question?",
-        ]),
+        "suggested_prompts": [
+            f"What are the core concepts covered in {rooms_data[0]['topic']}?" if rooms_data else "What is the overview of this course?",
+            "Can you explain the intuition behind backpropagation and gradient descent?",
+            "What is the difference between convolutional layers and fully connected layers?",
+            "Can you quiz my understanding with a challenging conceptual question?",
+        ],
         "rooms": rooms_data,
         "edges": edges,
     }
@@ -388,7 +467,7 @@ def compile_persona_spec(
                     strength=1.8,
                     embedding=embedding,
                 )
-                smriti.palace.place_memory(mem)
+                smriti.palace.place_memory(mem, room=room)
                 total_pinned += 1
 
         # 3. Add Typed Semantic Edges

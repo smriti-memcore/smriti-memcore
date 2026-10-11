@@ -133,7 +133,9 @@ def pull_persona(
         os.makedirs(root, exist_ok=True)
 
     # 0. Check if persona_id is a direct filepath to a .smritibundle archive or directory
-    if os.path.exists(persona_id) and (persona_id.endswith(BUNDLE_EXTENSION) or os.path.isdir(persona_id)):
+    if persona_id.endswith(BUNDLE_EXTENSION) or "/" in persona_id or "\\" in persona_id:
+        if not os.path.exists(persona_id):
+            raise FileNotFoundError(f"Local bundle file not found: '{persona_id}'")
         import tempfile
         with tempfile.TemporaryDirectory() as td:
             temp_m = import_bundle(persona_id, td)
