@@ -1,0 +1,11 @@
+---
+description: SMRITI DevBrain Persistent Memory rules for coding agent
+globs: *
+alwaysApply: true
+---
+
+# SMRITI Memory Protocol
+
+- Call `smriti_recall` on task start with keywords related to the task.
+- Call `smriti_encode` when an architectural decision is finalized, a bug is solved, or a pattern is established.
+- Current Workspace Room: `repo:Memory`

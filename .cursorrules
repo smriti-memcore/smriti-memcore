@@ -1,0 +1,10 @@
+# SMRITI DevBrain: Persistent Memory for Cursor
+# Room: repo:Memory (ID: a2eac4d9)
+
+You are connected to SMRITI Long-Term Memory.
+Before answering any user question or starting any coding task:
+1. ALWAYS call `smriti_recall` with 2-3 keywords relevant to the user request.
+2. If this workspace has prior architecture decisions, conventions, or solved bugs, incorporate them.
+3. When you finalize a key architecture choice, resolve an edge case bug, or learn a user preference:
+   Call `smriti_encode` with clear, concise findings so future sessions remember it.
+4. Keep memories concise and factual.
