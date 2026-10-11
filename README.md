@@ -86,38 +86,45 @@ Inspired by human Dual-Process cognitive theory, SMRITI splits memory operations
 
 ## 🏁 Quick Start
 
-### 1. Living Mentors Hub & Coursework Palaces
+### 1. Install SMRITI
 
-SMRITI transforms static course materials (PDF lecture slides, video transcripts, syllabi, reading notes) into self-contained, offline-first **Cognitive Palace Bundles** (`.smritibundle`). 
-
-#### 👨‍🏫 For Professors & Course Creators: Package Your Curriculum
-
-Turn your raw lecture folder into a 24/7 Socratic Teaching Assistant for your students with a single command. SMRITI automatically extracts text from PDFs, cleans WebVTT/SRT lecture transcripts, parses Jupyter notebooks, groups materials by lecture topic, and embeds memories with local vector search.
+Install the core memory engine and CLI via pip:
 
 ```bash
-# 1. Package a folder of slides, transcripts, and readings into an offline bundle:
+pip install smriti-memcore
+```
+
+*(Optional: Ensure [Ollama](https://ollama.com) is running locally for 100% private, free LLM inference: `ollama run mistral`)*
+
+---
+
+### 2. Instructions for Professors & Course Creators: Package Your Curriculum
+
+Turn your raw lecture folder into a self-contained, offline-first **Cognitive Palace Bundle** (`.smritibundle`) that acts as a 24/7 Socratic Teaching Assistant for your students.
+
+```bash
+# Package a folder of slides, transcripts, readings, or notebooks into an offline bundle:
 smriti pack ./my-course-folder -o cs101.smritibundle
 
-# 2. Or package directly from a declarative YAML/JSON persona spec:
+# Or package directly from a declarative YAML/JSON persona spec:
 smriti pack ./course-spec.yaml -o cs101.smritibundle --install
 ```
 
-* **Supported Formats**: PDF slides, WebVTT/SRT video transcripts, Markdown, plain text, and Jupyter notebooks (`.ipynb`).
+* **Supported Formats**: PDF slides, WebVTT/SRT video lecture transcripts, Markdown, plain text, and Jupyter notebooks (`.ipynb`).
 * **Zero Cloud Costs**: All vector embeddings are calculated locally ($0 OpenAI/HuggingFace API bills).
-* **Lightweight Distribution**: Generates a self-contained archive (typically 5–15 MB) containing the vector index, full-text search, and semantic graph. You can upload it directly to Canvas, Blackboard, Piazza, Google Drive, or email it to students.
+* **Lightweight Distribution**: Generates a self-contained archive (typically 5–15 MB) containing the vector index, full-text search, and semantic graph. Upload it directly to Canvas, Blackboard, Piazza, Google Drive, or email it to students.
 
-#### 🎓 For Students: 24/7 Interactive Socratic Office Hours
+---
 
-Students can download the professor's `.smritibundle` and converse with a personalized course mentor directly in their terminal without internet access or recurring subscription fees.
+### 3. Instructions for Students: 24/7 Socratic Office Hours
+
+Students download the professor's `.smritibundle` and converse with an interactive course mentor directly in their terminal—100% offline, private, and subscription-free.
 
 ```bash
-# 1. Install SMRITI
-pip install smriti-memcore
-
-# 2. Import the course bundle provided by your professor
+# Step 1: Import the course bundle provided by your professor
 smriti pull ./cs101.smritibundle
 
-# 3. Start your 24/7 Socratic Office Hours
+# Step 2: Start your 24/7 Socratic Office Hours
 smriti chat cs101
 
 # (Optional) Use a specific local Ollama model (e.g. Mistral, Qwen, Llama)
@@ -130,7 +137,7 @@ smriti chat cs101 --model qwen3.5
 * **100% Local & Private**: All conversations stay on the student's laptop—zero student data is sent to external servers.
 
 #### 🌐 Pre-Curated Mentors in Official Registry
-You can also chat with out-of-the-box exemplars:
+You can also explore out-of-the-box mentors right away:
 ```bash
 # List all available mentors and locally installed bundles
 smriti list
@@ -149,7 +156,7 @@ smriti chat marcus-aurelius
 
 ---
 
-### 2. Smriti DevBrain: Universal Developer Memory (Cursor, Claude, Windsurf, Gemini, Zed)
+### 4. Smriti DevBrain: Universal Developer Memory (Cursor, Claude, Windsurf, Gemini, Zed)
 
 SMRITI solves cross-agent amnesia by acting as a shared, local cognitive brain across all your AI coding tools. A bug solved in Claude Code or Gemini is immediately remembered by Cursor.
 
