@@ -42,6 +42,7 @@ Inspired by human Dual-Process cognitive theory, SMRITI splits memory operations
 ## 🚀 Key Capabilities
 
 *   🧠 **Dual-Process Performance**: Zero-blocking real-time loops. Write immediately, analyze when idle.
+*   🎭 **Persona Palaces & On-Demand Hub**: Download pre-curated cognitive memory palaces for historical figures (e.g., Albert Einstein, Isaac Newton) and converse with them with authentic mental models.
 *   🔒 **Privacy-First (Private Rooms)**: Create local semantic rooms whose memories are automatically excluded from shared/team-wide sync.
 *   🔌 **Model Context Protocol (MCP)**: Native MCP server integration with Claude Code, Claude Desktop, Gemini Antigravity, and Codex.
 *   📦 **AMP v1.0 Spec Compliant**: Drop-in compatibility with any agent framework conforming to the Agent Memory Protocol.
@@ -85,7 +86,29 @@ Inspired by human Dual-Process cognitive theory, SMRITI splits memory operations
 
 ## 🏁 Quick Start
 
-### 1. Unified MCP Server (Claude Code, Gemini, Codex)
+### 1. Unified SMRITI CLI & Persona Hub
+
+The fastest way to experience SMRITI is through the unified `smriti` command-line tool:
+
+```bash
+pip install smriti-memcore
+
+# List official registry and installed memory personas
+smriti list
+
+# Pull a pre-curated cognitive memory palace on-demand (e.g. Albert Einstein)
+smriti pull einstein
+
+# Start an interactive conversation with the persona
+smriti chat einstein
+
+# Launch the visual D3.js memory graph in your browser
+smriti ui
+```
+
+---
+
+### 2. Unified MCP Server (Claude Code, Gemini, Codex)
 
 SMRITI can be used as a global, persistent memory layer across all your MCP-enabled developer clients.
 
@@ -95,16 +118,15 @@ Run the setup script directly in your terminal:
 bash <(curl -s https://raw.githubusercontent.com/smriti-memcore/smriti-memcore/main/install_smriti_mcp.sh)
 ```
 
-#### Method B: Via PyPI
-Install the package and run the setup CLI:
+#### Method B: Via CLI
 ```bash
 pip3 install smriti-memcore
-smriti_install
+smriti install
 ```
 
 ---
 
-### 2. Python SDK
+### 3. Python SDK
 
 For application developers building custom agent loops.
 
@@ -135,6 +157,12 @@ for mem in results:
 # Manually trigger System 2 background consolidation
 memory.consolidate()
 memory.save()
+
+# --- Or Load a Pre-Curated Persona (e.g. Albert Einstein) ---
+einstein, manifest = SMRITI.from_persona("albert-einstein")
+memories = einstein.recall("What thought experiment led to Special Relativity?")
+for mem in memories:
+    print(f"[{mem.strength:.2f}] {mem.content}")
 ```
 
 ---
