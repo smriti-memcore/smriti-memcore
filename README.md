@@ -86,27 +86,65 @@ Inspired by human Dual-Process cognitive theory, SMRITI splits memory operations
 
 ## 🏁 Quick Start
 
-### 1. Unified SMRITI CLI & Living Mentors Hub
+### 1. Living Mentors Hub & Coursework Palaces
 
-Experience pre-curated cognitive mentors or compile your own domain memory palaces (.smritibundle) for education, therapy, or engineering:
+SMRITI transforms static course materials (PDF lecture slides, video transcripts, syllabi, reading notes) into self-contained, offline-first **Cognitive Palace Bundles** (`.smritibundle`). 
+
+#### 👨‍🏫 For Professors & Course Creators: Package Your Curriculum
+
+Turn your raw lecture folder into a 24/7 Socratic Teaching Assistant for your students with a single command. SMRITI automatically extracts text from PDFs, cleans WebVTT/SRT lecture transcripts, parses Jupyter notebooks, groups materials by lecture topic, and embeds memories with local vector search.
 
 ```bash
+# 1. Package a folder of slides, transcripts, and readings into an offline bundle:
+smriti pack ./my-course-folder -o cs101.smritibundle
+
+# 2. Or package directly from a declarative YAML/JSON persona spec:
+smriti pack ./course-spec.yaml -o cs101.smritibundle --install
+```
+
+* **Supported Formats**: PDF slides, WebVTT/SRT video transcripts, Markdown, plain text, and Jupyter notebooks (`.ipynb`).
+* **Zero Cloud Costs**: All vector embeddings are calculated locally ($0 OpenAI/HuggingFace API bills).
+* **Lightweight Distribution**: Generates a self-contained archive (typically 5–15 MB) containing the vector index, full-text search, and semantic graph. You can upload it directly to Canvas, Blackboard, Piazza, Google Drive, or email it to students.
+
+#### 🎓 For Students: 24/7 Interactive Socratic Office Hours
+
+Students can download the professor's `.smritibundle` and converse with a personalized course mentor directly in their terminal without internet access or recurring subscription fees.
+
+```bash
+# 1. Install SMRITI
 pip install smriti-memcore
 
-# 1. Browse available cognitive personas (Professors, Counsellors, Historical Thinkers)
+# 2. Import the course bundle provided by your professor
+smriti pull ./cs101.smritibundle
+
+# 3. Start your 24/7 Socratic Office Hours
+smriti chat cs101
+
+# (Optional) Use a specific local Ollama model (e.g. Mistral, Qwen, Llama)
+smriti chat cs101 --model mistral
+smriti chat cs101 --model qwen3.5
+```
+
+* **Pinpoint Attribution**: Asks about any concept and surfaces exact slide page numbers and video lecture transcript quotes.
+* **Socratic Pedagogy**: Rather than simply giving away homework answers, the course persona guides students step-by-step from first principles using course analogies.
+* **100% Local & Private**: All conversations stay on the student's laptop—zero student data is sent to external servers.
+
+#### 🌐 Pre-Curated Mentors in Official Registry
+You can also chat with out-of-the-box exemplars:
+```bash
+# List all available mentors and locally installed bundles
 smriti list
 
-# 2. Chat with a 24/7 Socratic Distributed Systems Professor
+# Socratic Distributed Systems Professor (Raft, Paxos, CAP theorem)
 smriti chat prof-systems
 
-# 3. Chat with a 100% private, local CBT & Mindfulness Counsellor
+# 100% Private, Local CBT & Mindfulness Companion
 smriti chat mindful-counsellor
 
-# 4. Chat with Albert Einstein
+# Historical Thinkers
 smriti chat einstein
-
-# 5. Compile your own course or counseling persona into a distributable .smritibundle
-smriti pack ./my-course.yaml --install
+smriti chat newton
+smriti chat marcus-aurelius
 ```
 
 ---
