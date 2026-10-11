@@ -67,9 +67,27 @@ def cmd_chat(args: argparse.Namespace):
 
 
 def cmd_ui(args: argparse.Namespace):
-    print("🌐 Launching SMRITI Visual Memory Graph UI...")
-    from smriti_memcore.ui.__main__ import main as ui_main
-    ui_main()
+    print(f"🌐 Launching SMRITI Visual Memory Graph UI on port {args.port}...")
+    from smriti_memcore.ui.server import launch
+    launch(storage_path=args.storage, port=args.port, open_browser=not args.no_browser)
+
+
+def cmd_consolidate(args: argparse.Namespace):
+    from smriti_memcore.core import SMRITI
+    from smriti_memcore.models import ConsolidationDepth, SmritiConfig
+    print("🧠 Running SMRITI System 2 Background Consolidation...")
+    cfg = SmritiConfig()
+    if args.storage:
+        cfg.storage_path = args.storage
+    smriti = SMRITI(config=cfg)
+    depth = ConsolidationDepth(args.depth) if args.depth else None
+    result = smriti.consolidate(depth=depth)
+    smriti.save()
+    smriti.close()
+    print("\n✅ Consolidation completed successfully!")
+    if isinstance(result, dict):
+        for k, v in result.items():
+            print(f"   • {k}: {v}")
 
 
 def cmd_install(args: argparse.Namespace):
@@ -126,13 +144,22 @@ def main(argv: Optional[List[str]] = None):
 
     # 4. ui
     p_ui = subparsers.add_parser("ui", help="Launch the interactive D3.js memory graph visualization")
+    p_ui.add_argument("--storage", "-s", default="~/.smriti/global", help="Path to storage directory (default: ~/.smriti/global)")
+    p_ui.add_argument("--port", "-p", type=int, default=7799, help="Port to serve UI on (default: 7799)")
+    p_ui.add_argument("--no-browser", action="store_true", help="Don't open browser automatically")
     p_ui.set_defaults(func=cmd_ui)
 
-    # 5. install
+    # 5. consolidate
+    p_consolidate = subparsers.add_parser("consolidate", help="Trigger System 2 background consolidation")
+    p_consolidate.add_argument("--depth", "-d", choices=["full", "light"], default=None, help="Consolidation depth")
+    p_consolidate.add_argument("--storage", "-s", default=None, help="Path to storage directory (default: ~/.smriti/global)")
+    p_consolidate.set_defaults(func=cmd_consolidate)
+
+    # 6. install
     p_install = subparsers.add_parser("install", help="Install SMRITI MCP server for Claude, Antigravity, and Cursor")
     p_install.set_defaults(func=cmd_install)
 
-    # 6. stats
+    # 7. stats
     p_stats = subparsers.add_parser("stats", help="Display local memory palace and vector store statistics")
     p_stats.set_defaults(func=cmd_stats)
 
