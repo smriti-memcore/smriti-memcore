@@ -69,7 +69,12 @@ def run_persona_chat(persona_id: str = "albert-einstein", model: Optional[str] =
             # Generate response via smriti's LLM interface
             prompt = f"User asked: {user_input}\nRespond in character:"
             response = smriti.llm.generate(prompt=prompt, system=system_prompt)
-            reply = response.content if hasattr(response, "content") else str(response)
+            if hasattr(response, "text") and response.text:
+                reply = response.text
+            elif hasattr(response, "content") and response.content:
+                reply = response.content
+            else:
+                reply = str(response)
             print(reply.strip() + "\n")
         except Exception as e:
             # Fallback if no local/remote LLM is running
