@@ -103,7 +103,12 @@ class VectorStore:
         if self._model is None:
             try:
                 from sentence_transformers import SentenceTransformer
-                self._model = SentenceTransformer(self.model_name)
+                # 1. Prioritize strictly offline local cache (zero network calls / zero HF pings)
+                try:
+                    self._model = SentenceTransformer(self.model_name, local_files_only=True)
+                except Exception:
+                    # 2. Fallback only if model has never been downloaded to this machine before
+                    self._model = SentenceTransformer(self.model_name)
                 logger.info(f"Loaded embedding model: {self.model_name}")
             except ImportError:
                 logger.warning(
