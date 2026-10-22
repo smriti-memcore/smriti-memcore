@@ -92,6 +92,9 @@ Inspired by human Dual-Process cognitive theory, SMRITI splits memory operations
 The fastest way to experience SMRITI is through the unified `smriti` command-line tool:
 
 ```bash
+# Recommended for standalone CLI (isolated environment + automatic PATH setup):
+pipx install smriti-memcore
+# or inside a virtualenv:
 pip install smriti-memcore
 
 # List official registry and installed memory personas
