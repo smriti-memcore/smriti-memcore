@@ -32,6 +32,8 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
         # Uses OIDC trusted publishing — no API token needed.
         # Configure at: https://pypi.org/manage/project/smriti-memcore/settings/publishing/
 

@@ -186,7 +186,7 @@ def main(argv: Optional[List[str]] = None):
         from importlib.metadata import version
         pkg_version = version("smriti-memcore")
     except Exception:
-        pkg_version = "1.4.26"
+        pkg_version = "1.4.27"
 
     parser.add_argument("-v", "--version", action="version", version=f"smriti {pkg_version}")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
