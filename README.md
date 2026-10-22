@@ -89,12 +89,9 @@ Inspired by human Dual-Process cognitive theory, SMRITI splits memory operations
 
 ### 1. Install SMRITI
 
-Install the core memory engine and CLI via pip:
+Install the core memory engine and CLI:
 
 ```bash
-# Recommended for standalone CLI (isolated environment + automatic PATH setup):
-pipx install smriti-memcore
-# or inside a virtualenv:
 pip install smriti-memcore
 ```
 
