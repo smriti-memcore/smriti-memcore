@@ -30,17 +30,17 @@ OFFICIAL_REGISTRY: Dict[str, Dict[str, str]] = {
     "albert-einstein": {
         "name": "Albert Einstein",
         "description": "Historical memory palace of Albert Einstein (Relativity, Quantum debates, Spinoza's God, Pacifism)",
-        "download_url": "https://github.com/smriti-memcore/smriti-memcore/releases/download/v1.4.26/albert-einstein.smritibundle",
+        "download_url": "https://github.com/smriti-memcore/smriti-memcore/releases/download/v1.4.27/albert-einstein.smritibundle",
     },
     "isaac-newton": {
         "name": "Isaac Newton",
         "description": "Historical memory palace of Sir Isaac Newton (Classical mechanics, Optics, Gravitation, Calculus)",
-        "download_url": "https://github.com/smriti-memcore/smriti-memcore/releases/download/v1.4.26/isaac-newton.smritibundle",
+        "download_url": "https://github.com/smriti-memcore/smriti-memcore/releases/download/v1.4.27/isaac-newton.smritibundle",
     },
     "marcus-aurelius": {
         "name": "Marcus Aurelius",
         "description": "Philosophical memory palace of Marcus Aurelius (Meditations, Stoic ethics, Duty, Mortality)",
-        "download_url": "https://github.com/smriti-memcore/smriti-memcore/releases/download/v1.4.26/marcus-aurelius.smritibundle",
+        "download_url": "https://github.com/smriti-memcore/smriti-memcore/releases/download/v1.4.27/marcus-aurelius.smritibundle",
     },
 }
 
