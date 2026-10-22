@@ -14,7 +14,7 @@
 [![Website](https://img.shields.io/badge/website-smriti--memcore.com-c5a059?style=flat&logo=vercel)](https://www.smriti-memcore.com)
 [![SMRITI Memory MCP server](https://mcprush.com/badge/smriti-memory-mcp/card.svg)](https://mcprush.com/to/smriti-memory-mcp?ref=badge)
 
-<!-- mcp-name: io.github.shivamtyagi18/smriti-memory -->
+<!-- mcp-name: io.github.smriti-memcore/smriti-memory -->
 
 ---
 
