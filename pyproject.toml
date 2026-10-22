@@ -51,6 +51,10 @@ benchmarks = [
 mcp = [
     "mcp>=1.0.0",
 ]
+personas = [
+    "pypdf>=4.0.0",
+    "pyyaml>=6.0",
+]
 
 [project.scripts]
 smriti = "smriti_memcore.cli:main"

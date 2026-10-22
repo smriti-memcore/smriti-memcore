@@ -87,42 +87,101 @@ Inspired by human Dual-Process cognitive theory, SMRITI splits memory operations
 
 ## 🏁 Quick Start
 
-### 1. Unified SMRITI CLI & Persona Hub
+### 1. Install SMRITI
 
-The fastest way to experience SMRITI is through the unified `smriti` command-line tool:
+Install the core memory engine and CLI:
 
 ```bash
 pip install smriti-memcore
+```
 
-# List official registry and installed memory personas
+*(Optional: Ensure [Ollama](https://ollama.com) is running locally for 100% private, free LLM inference: `ollama run mistral`)*
+
+---
+
+### 2. Instructions for Professors & Course Creators: Package Your Curriculum
+
+Turn your raw lecture folder into a self-contained, offline-first **Cognitive Palace Bundle** (`.smritibundle`) that acts as a 24/7 Socratic Teaching Assistant for your students.
+
+```bash
+# Package a folder of slides, transcripts, readings, or notebooks into an offline bundle:
+smriti pack ./my-course-folder -o cs101.smritibundle
+
+# Or package directly from a declarative YAML/JSON persona spec:
+smriti pack ./course-spec.yaml -o cs101.smritibundle --install
+```
+
+* **Supported Formats**: PDF slides, WebVTT/SRT video lecture transcripts, Markdown, plain text, and Jupyter notebooks (`.ipynb`).
+* **Zero Cloud Costs**: All vector embeddings are calculated locally ($0 OpenAI/HuggingFace API bills).
+* **Lightweight Distribution**: Generates a self-contained archive (typically 5–15 MB) containing the vector index, full-text search, and semantic graph. Upload it directly to Canvas, Blackboard, Piazza, Google Drive, or email it to students.
+
+---
+
+### 3. Instructions for Students: 24/7 Socratic Office Hours
+
+Students download the professor's `.smritibundle` and converse with an interactive course mentor directly in their terminal—100% offline, private, and subscription-free.
+
+```bash
+# Step 1: Import the course bundle provided by your professor
+smriti pull ./cs101.smritibundle
+
+# Step 2: Start your 24/7 Socratic Office Hours
+smriti chat cs101
+
+# (Optional) Use a specific local Ollama model (e.g. Mistral, Qwen, Llama)
+smriti chat cs101 --model mistral
+smriti chat cs101 --model qwen3.5
+```
+
+* **Pinpoint Attribution**: Asks about any concept and surfaces exact slide page numbers and video lecture transcript quotes.
+* **Socratic Pedagogy**: Rather than simply giving away homework answers, the course persona guides students step-by-step from first principles using course analogies.
+* **100% Local & Private**: All conversations stay on the student's laptop—zero student data is sent to external servers.
+
+#### 🌐 Pre-Curated Mentors in Official Registry
+You can also explore out-of-the-box mentors right away:
+```bash
+# List all available mentors and locally installed bundles
 smriti list
 
-# Pull a pre-curated cognitive memory palace on-demand (e.g. Albert Einstein)
-smriti pull einstein
+# Socratic Distributed Systems Professor (Raft, Paxos, CAP theorem)
+smriti chat prof-systems
 
-# Start an interactive conversation with the persona
+# 100% Private, Local CBT & Mindfulness Companion
+smriti chat mindful-counsellor
+
+# Historical Thinkers
 smriti chat einstein
-
-# Launch the visual D3.js memory graph in your browser
-smriti ui
+smriti chat newton
+smriti chat marcus-aurelius
 ```
 
 ---
 
-### 2. Unified MCP Server (Claude Code, Gemini, Codex)
+### 4. Smriti DevBrain: Universal Developer Memory (Cursor, Claude, Windsurf, Gemini, Zed)
 
-SMRITI can be used as a global, persistent memory layer across all your MCP-enabled developer clients.
+SMRITI solves cross-agent amnesia by acting as a shared, local cognitive brain across all your AI coding tools. A bug solved in Claude Code or Gemini is immediately remembered by Cursor.
 
-#### Method A: One-Line Installer (Recommended)
-Run the setup script directly in your terminal:
+#### Step 1: Auto-Configure All Installed IDEs & Agents
+Run one command to scan and configure Cursor, Claude Code, Windsurf, Gemini, and Zed in seconds:
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/smriti-memcore/smriti-memcore/main/install_smriti_mcp.sh)
-```
-
-#### Method B: Via CLI
-```bash
-pip3 install smriti-memcore
 smriti install
+```
+*(Or target specific tools: `smriti install --client cursor,windsurf`)*
+
+#### Step 2: Initialize a Codebase Workspace
+Inside any repository, run:
+```bash
+smriti init
+```
+This automatically:
+- Creates a dedicated Semantic Room in the Palace for the project (`repo:<name>`).
+- Scaffolds `.cursorrules`, `.cursor/rules/smriti.mdc`, `CLAUDE.md`, and project `.cursor/mcp.json`.
+- Installs a lightweight, non-blocking git `post-commit` hook that records recent commits and architectural changes into memory.
+
+#### Git Commit Memory Hook Management:
+```bash
+smriti hook install    # Enable automatic commit context logging
+smriti hook uninstall  # Remove the post-commit hook
 ```
 
 ---

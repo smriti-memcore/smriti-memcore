@@ -122,9 +122,25 @@ class SemanticPalace:
 
     def find_rooms(self, query: str, top_k: int = 3) -> List[Room]:
         """Find rooms most relevant to a query (contextual priming)."""
+        if not self.rooms:
+            return []
+
+        # If room embeddings are available in-memory, compute exact similarity
+        if self._room_embeddings:
+            query_embedding = self.vector_store.embed(query)
+            scored = []
+            for rid, remb in self._room_embeddings.items():
+                room = self.rooms.get(rid)
+                if room and remb is not None:
+                    sim = float(np.dot(query_embedding, remb))
+                    scored.append((room, sim))
+            scored.sort(key=lambda x: x[1], reverse=True)
+            return [r for r, s in scored[:top_k]]
+
+        # Fallback to vector store search with wider pool
         results = self.vector_store.search(
             query=query,
-            top_k=top_k * 2,  # Search wider to filter
+            top_k=max(top_k * 10, 100),
         )
 
         rooms = []
@@ -132,7 +148,7 @@ class SemanticPalace:
             if vec_id.startswith("room:"):
                 rid = vec_id[5:]
                 room = self.rooms.get(rid)
-                if room:
+                if room and room not in rooms:
                     rooms.append(room)
                     if len(rooms) >= top_k:
                         break
@@ -172,7 +188,9 @@ class SemanticPalace:
     def place_memory(self, memory: Memory, room: Optional[Room] = None) -> Room:
         """Place a memory in the palace (in a specific room or auto-assigned)."""
         with self._lock:
-            if room is None:
+            if room is None and memory.room_id and memory.room_id in self.rooms:
+                room = self.rooms[memory.room_id]
+            elif room is None:
                 room = self.find_or_create_room(memory.content)
 
             memory.room_id = room.id
@@ -288,7 +306,7 @@ class SemanticPalace:
 
             # Search within entry room (hop=0)
             for mem in self.get_room_memories(room.id):
-                if mem.embedding:
+                if mem.embedding is not None:
                     score = float(np.dot(query_embedding, np.array(mem.embedding)))
                     if mem.id not in candidates or score > candidates[mem.id][1]:
                         candidates[mem.id] = (mem, score, 0)
@@ -300,12 +318,25 @@ class SemanticPalace:
                     neighbor.last_visited = datetime.now()
 
                     for mem in self.get_room_memories(neighbor.id):
-                        if mem.embedding:
+                        if mem.embedding is not None:
                             score = float(np.dot(query_embedding, np.array(mem.embedding)))
                             # Discount neighbor scores slightly
                             score *= 0.85 * edge.strength
                             if mem.id not in candidates or score > candidates[mem.id][1]:
                                 candidates[mem.id] = (mem, score, 1)
+
+        # Also include direct memory hits from vector store
+        try:
+            vec_hits = self.vector_store.search(query, top_k=top_k * 2)
+            for vec_id, vscore in vec_hits:
+                if vec_id.startswith("mem:"):
+                    mid = vec_id[4:]
+                    mem = self.get_memory(mid)
+                    if mem and mem.status in (MemoryStatus.ACTIVE, MemoryStatus.PINNED):
+                        if mem.id not in candidates or vscore > candidates[mem.id][1]:
+                            candidates[mem.id] = (mem, float(vscore), 0)
+        except Exception as e:
+            logger.debug(f"Direct vector candidate lookup bypassed: {e}")
 
         # Sort by score and take top_k
         sorted_candidates = sorted(
@@ -330,7 +361,7 @@ class SemanticPalace:
         for mem in self.memories.values():
             if mem.status not in (MemoryStatus.ACTIVE, MemoryStatus.PINNED) or mem.strength < min_strength:
                 continue
-            if mem.embedding:
+            if mem.embedding is not None:
                 score = float(np.dot(query_embedding, np.array(mem.embedding)))
                 if score > 0.4:
                     mem.retrieval_score = score
@@ -368,7 +399,7 @@ class SemanticPalace:
         embeddings = []
         for mid in room.memory_ids:
             mem = self.memories.get(mid)
-            if mem and mem.embedding:
+            if mem and mem.embedding is not None:
                 embeddings.append(np.array(mem.embedding))
         
         if embeddings:

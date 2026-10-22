@@ -102,8 +102,18 @@ class VectorStore:
         """Lazy-load the embedding model."""
         if self._model is None:
             try:
+                try:
+                    from transformers.utils import logging as tf_logging
+                    tf_logging.disable_progress_bar()
+                except Exception:
+                    pass
                 from sentence_transformers import SentenceTransformer
-                self._model = SentenceTransformer(self.model_name)
+                # 1. Prioritize strictly offline local cache (zero network calls / zero HF pings)
+                try:
+                    self._model = SentenceTransformer(self.model_name, local_files_only=True)
+                except Exception:
+                    # 2. Fallback only if model has never been downloaded to this machine before
+                    self._model = SentenceTransformer(self.model_name)
                 logger.info(f"Loaded embedding model: {self.model_name}")
             except ImportError:
                 logger.warning(
@@ -117,11 +127,11 @@ class VectorStore:
 
     def embed(self, text: str) -> np.ndarray:
         """Generate embedding for a single text."""
-        return self.model.encode(text, normalize_embeddings=True)
+        return self.model.encode(text, normalize_embeddings=True, show_progress_bar=False)
 
     def embed_batch(self, texts: List[str]) -> np.ndarray:
         """Generate embeddings for multiple texts."""
-        return self.model.encode(texts, normalize_embeddings=True, batch_size=32)
+        return self.model.encode(texts, normalize_embeddings=True, batch_size=32, show_progress_bar=False)
 
     # ── Storage Operations ───────────────────────────────
 

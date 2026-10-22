@@ -91,9 +91,74 @@ def cmd_consolidate(args: argparse.Namespace):
 
 
 def cmd_install(args: argparse.Namespace):
-    print("🔌 Setting up SMRITI MCP Server...")
     from smriti_memcore.integrations.install import main as install_main
-    install_main()
+    install_args = []
+    if getattr(args, "all", False):
+        install_args.append("--all")
+    if getattr(args, "client", None):
+        install_args.extend(["--client", args.client])
+    if getattr(args, "storage", None):
+        install_args.extend(["--storage", args.storage])
+    if getattr(args, "model", None):
+        install_args.extend(["--model", args.model])
+    if getattr(args, "api_key", None):
+        install_args.extend(["--api-key", args.api_key])
+    if getattr(args, "obsidian", None):
+        install_args.extend(["--obsidian", args.obsidian])
+    if getattr(args, "yes", False):
+        install_args.append("--yes")
+    install_main(install_args)
+
+
+def cmd_init(args: argparse.Namespace):
+    from smriti_memcore.devbrain import init_workspace
+    print("\n⚡ Initializing SMRITI DevBrain Workspace...\n")
+    res = init_workspace(
+        target_path=args.path,
+        room_name=args.room_name,
+        storage_path=args.storage,
+        install_hook=not args.no_hook,
+    )
+    print(f"  ✓ Workspace Root : {res['repo_root']}")
+    print(f"  ✓ Semantic Room  : {res['room_topic']} (ID: {res['room_id']})")
+    print(f"  ✓ Config Files   : {', '.join(res['created_files']) if res['created_files'] else 'Already configured'}")
+    if res['git_hook_installed']:
+        print("  ✓ Git Commit Hook: Installed (auto-records future commits)")
+    print("\n🎉 Workspace initialized! AI coding agents in this repo are now memory-aware.\n")
+
+
+def cmd_hook(args: argparse.Namespace):
+    from smriti_memcore.devbrain import install_git_hook, uninstall_git_hook
+    if args.action == "install":
+        ok = install_git_hook()
+        if ok:
+            print("✓ Git post-commit memory hook installed successfully.")
+        else:
+            print("✗ Could not install hook (is this a git repository?)")
+    elif args.action == "uninstall":
+        ok = uninstall_git_hook()
+        if ok:
+            print("✓ Git post-commit memory hook uninstalled.")
+def cmd_pack(args: argparse.Namespace):
+    from smriti_memcore.personas.compiler import compile_path
+    print(f"\n📦 Compiling SMRITI Persona Bundle from '{args.spec}'...\n")
+    out_path, spec = compile_path(
+        source_path=args.spec,
+        output_bundle_path=args.output,
+        install=args.install,
+    )
+    print(f"  ✓ Persona Name : {spec.get('name', 'Custom Persona')}")
+    print(f"  ✓ Identifier   : {spec.get('id', 'custom')}")
+    print(f"  ✓ Rooms        : {len(spec.get('rooms', []))}")
+    print(f"  ✓ Output Bundle: {out_path}")
+    if args.install:
+        print(f"  ✓ Auto-installed to ~/.smriti/personas/{spec.get('id', 'custom')}")
+        print(f"\nYou can now chat with this persona immediately:")
+        print(f"  smriti chat {spec.get('id', 'custom')}\n")
+    else:
+        print(f"\nBundle ready for distribution! Students/Users can load it with:")
+        print(f"  smriti pull {out_path}")
+        print(f"  smriti chat {spec.get('id', 'custom')}\n")
 
 
 def cmd_stats(args: argparse.Namespace):
@@ -156,10 +221,37 @@ def main(argv: Optional[List[str]] = None):
     p_consolidate.set_defaults(func=cmd_consolidate)
 
     # 6. install
-    p_install = subparsers.add_parser("install", help="Install SMRITI MCP server for Claude, Antigravity, and Cursor")
+    p_install = subparsers.add_parser("install", help="Universal installer for Claude, Cursor, Windsurf, Gemini, Zed, etc.")
+    p_install.add_argument("--all", "-a", action="store_true", help="Install to all detected IDEs & agents automatically")
+    p_install.add_argument("--client", "-c", help="Specific clients to configure (e.g. cursor,claude_code,windsurf)")
+    p_install.add_argument("--storage", "-s", default="~/.smriti/global", help="Memory storage directory")
+    p_install.add_argument("--model", "-m", default="mistral", help="Consolidation LLM model")
+    p_install.add_argument("--api-key", default="", help="Cloud LLM API key")
+    p_install.add_argument("--obsidian", default="", help="Obsidian vault path")
+    p_install.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompts")
     p_install.set_defaults(func=cmd_install)
 
-    # 7. stats
+    # 7. init
+    p_init = subparsers.add_parser("init", help="Initialize Smriti DevBrain in a codebase workspace")
+    p_init.add_argument("path", nargs="?", default=None, help="Project directory (default: current directory)")
+    p_init.add_argument("--room-name", "-r", default=None, help="Semantic room name override")
+    p_init.add_argument("--storage", "-s", default="~/.smriti/global", help="Memory storage path")
+    p_init.add_argument("--no-hook", action="store_true", help="Do not install git post-commit hook")
+    p_init.set_defaults(func=cmd_init)
+
+    # 8. hook
+    p_hook = subparsers.add_parser("hook", help="Manage git commit memory hooks")
+    p_hook.add_argument("action", choices=["install", "uninstall"], help="Action to perform")
+    p_hook.set_defaults(func=cmd_hook)
+
+    # 9. pack
+    p_pack = subparsers.add_parser("pack", help="Compile a knowledge specification (YAML/JSON) into a .smritibundle")
+    p_pack.add_argument("spec", help="Path to persona specification file (e.g. course.yaml, mentor.json)")
+    p_pack.add_argument("--output", "-o", default=None, help="Output .smritibundle file path")
+    p_pack.add_argument("--install", "-i", action="store_true", help="Automatically install compiled persona to local cache")
+    p_pack.set_defaults(func=cmd_pack)
+
+    # 10. stats
     p_stats = subparsers.add_parser("stats", help="Display local memory palace and vector store statistics")
     p_stats.set_defaults(func=cmd_stats)
 

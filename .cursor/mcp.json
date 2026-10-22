@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "smriti-memory": {
+      "command": "/Users/shivtatva/.smriti/venv/bin/python3",
+      "args": [
+        "-m",
+        "smriti_memcore.integrations.mcp_server"
+      ],
+      "env": {
+        "SMRITI_STORAGE_PATH": "/Users/shivtatva/.smriti/global",
+        "SMRITI_LLM_MODEL": "mistral",
+        "SMRITI_LLM_API_KEY": ""
+      }
+    }
+  }
+}

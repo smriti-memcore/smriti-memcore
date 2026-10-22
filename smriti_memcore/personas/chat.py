@@ -21,8 +21,23 @@ def run_persona_chat(persona_id: str = "albert-einstein", model: Optional[str] =
 
     smriti, manifest = SMRITI.from_persona(persona_id)
 
+    # Pre-warm embedding model silently so the user's first query has zero cold-start delay
+    try:
+        from transformers.utils import logging as tf_logging
+        tf_logging.disable_progress_bar()
+    except Exception:
+        pass
+    try:
+        _ = smriti.vector_store.embed("warmup")
+    except Exception:
+        pass
+
+    speaker_label = manifest.author or manifest.name
+    active_model = model or getattr(smriti.llm, "default_model", "mistral")
+
     print(f"\n🎭 Loaded Persona: {manifest.name} ({manifest.era})")
     print(f"📌 Tagline: {manifest.tagline}")
+    print(f"🤖 Active Model: {active_model} (Local Ollama)")
     print(f"🏛️  Rooms: {manifest.total_rooms} rooms | 🧠 Memories: {manifest.total_memories} pinned memories")
     print("\n🏛️  Cognitive Palace Rooms:")
     for r in manifest.core_rooms:
@@ -46,7 +61,8 @@ def run_persona_chat(persona_id: str = "albert-einstein", model: Optional[str] =
         if not user_input:
             continue
         if user_input.lower() in ("exit", "quit", "q"):
-            print(f"\n{manifest.name}: Farewell, my friend. Never lose a holy curiosity.")
+            farewell = manifest.metadata.get("farewell") or "Farewell, my friend. Thank you for this conversation."
+            print(f"\n{speaker_label}: {farewell}\n")
             break
 
         # 1. Recall relevant memories from the persona's semantic palace
@@ -60,22 +76,36 @@ def run_persona_chat(persona_id: str = "albert-einstein", model: Optional[str] =
         else:
             print("  (No direct anchor memories matched; reflecting...)")
 
-        # 2. Build augmented response using configured LLM or heuristic synthesis
+        # 2. Build augmented response using configured LLM with real-time streaming
         context_block = "\n".join([f"- {m.content}" for m in recalled])
-        system_prompt = f"{manifest.system_prompt_hint}\n\nRelevant memories from your life and thinking:\n{context_block}"
+        system_prompt = (
+            f"{manifest.system_prompt_hint}\n\n"
+            f"RELEVANT MEMORIES & CURRICULUM FROM YOUR PALACE:\n"
+            f"{context_block}\n\n"
+            f"GUIDANCE:\n"
+            f"- Speak authentically in your persona as {speaker_label}.\n"
+            f"- Answer the student directly, insightfully, and pedagogically.\n"
+            f"- Ground your explanation in the lecture materials above.\n"
+            f"- Do NOT repeat or echo the student's question."
+        )
 
-        print(f"\n{manifest.name}: ", end="", flush=True)
+        prompt = f"Student: {user_input}\n\n{speaker_label}:"
+
+        print(f"\n{speaker_label}: ", end="", flush=True)
         try:
-            # Generate response via smriti's LLM interface
-            prompt = f"User asked: {user_input}\nRespond in character:"
-            response = smriti.llm.generate(prompt=prompt, system=system_prompt)
-            if hasattr(response, "text") and response.text:
-                reply = response.text
-            elif hasattr(response, "content") and response.content:
-                reply = response.content
+            if hasattr(smriti.llm, "generate_stream"):
+                first_token = True
+                for token in smriti.llm.generate_stream(prompt=prompt, system=system_prompt, model=model):
+                    if first_token:
+                        token = token.lstrip()
+                        first_token = False
+                    sys.stdout.write(token)
+                    sys.stdout.flush()
+                print("\n")
             else:
-                reply = str(response)
-            print(reply.strip() + "\n")
+                response = smriti.llm.generate(prompt=prompt, system=system_prompt, model=model)
+                reply = response.text if hasattr(response, "text") else str(response)
+                print(reply.strip() + "\n")
         except Exception as e:
             # Fallback if no local/remote LLM is running
             print(

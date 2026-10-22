@@ -1,7 +1,17 @@
 """Tests for smriti_memcore.ui.server — episode feed data layer."""
 import json
 import sqlite3
-import pytest
+try:
+    import pytest
+except ImportError:
+    class _MockPytest:
+        @staticmethod
+        def approx(val):
+            class _Approx:
+                def __init__(self, v): self.v = v
+                def __eq__(self, o): return abs(self.v - o) < 1e-4
+            return _Approx(val)
+    pytest = _MockPytest()
 from pathlib import Path
 from smriti_memcore.ui.server import _read_episodes
 
@@ -96,21 +106,32 @@ def test_read_episodes_missing_db_returns_empty(tmp_path):
     assert result == []
 
 
-import threading
-import urllib.request
-from http.server import HTTPServer
+import io
 from smriti_memcore.ui.server import _Handler
 
 
-def _start_server(storage_path: str, port: int):
-    """Start a test UI server in a daemon thread."""
-    class Handler(_Handler):
-        pass
-    Handler.storage_path = storage_path
-    server = HTTPServer(("127.0.0.1", port), Handler)
-    t = threading.Thread(target=server.serve_forever, daemon=True)
-    t.start()
-    return server
+def _simulate_get(storage_path: str, path: str):
+    """Simulate a GET request through _Handler without requiring socket bindings."""
+    class SimulatedHandler(_Handler):
+        def __init__(self, p, s):
+            self.path = p
+            self.storage_path = s
+            self.wfile = io.BytesIO()
+            self.status = None
+            self.headers = {}
+
+        def send_response(self, code):
+            self.status = code
+
+        def send_header(self, k, v):
+            self.headers[k] = v
+
+        def end_headers(self):
+            pass
+
+    h = SimulatedHandler(path, storage_path)
+    h.do_GET()
+    return h.status, h.headers, h.wfile.getvalue()
 
 
 def test_api_episodes_endpoint_returns_json(tmp_path):
@@ -118,25 +139,96 @@ def test_api_episodes_endpoint_returns_json(tmp_path):
         ("id-1", "test content", "2026-04-12T10:00:00", '{"composite":0.4}',
          "user_stated", None, 0, None, 1, None),
     ])
-    server = _start_server(storage, 17799)
-    try:
-        with urllib.request.urlopen("http://127.0.0.1:17799/api/episodes") as resp:
-            assert resp.status == 200
-            assert "application/json" in resp.headers["Content-Type"]
-            data = json.loads(resp.read())
-            assert isinstance(data, list)
-            assert len(data) == 1
-            assert data[0]["id"] == "id-1"
-            assert data[0]["consolidated"] is True
-    finally:
-        server.shutdown()
+    status, headers, body = _simulate_get(storage, "/api/episodes")
+    assert status == 200
+    assert "application/json" in headers["Content-Type"]
+    data = json.loads(body)
+    assert isinstance(data, list)
+    assert len(data) == 1
+    assert data[0]["id"] == "id-1"
+    assert data[0]["consolidated"] is True
 
 
 def test_api_episodes_empty_when_no_db(tmp_path):
-    server = _start_server(str(tmp_path), 17800)
-    try:
-        with urllib.request.urlopen("http://127.0.0.1:17800/api/episodes") as resp:
-            data = json.loads(resp.read())
-            assert data == []
-    finally:
-        server.shutdown()
+    status, headers, body = _simulate_get(str(tmp_path), "/api/episodes")
+    assert status == 200
+    data = json.loads(body)
+    assert data == []
+
+
+def test_read_palace_nodes_and_edges(tmp_path):
+    from smriti_memcore.ui.server import _read_palace
+    palace_dir = tmp_path / "palace"
+    palace_dir.mkdir(parents=True)
+    palace_json = {
+        "rooms": {
+            "r1": {"id": "r1", "topic": "Quantum", "visibility": "shared", "memory_ids": ["m1"], "visit_count": 3}
+        },
+        "memories": {
+            "m1": {"id": "m1", "content": "Superposition state", "room_id": "r1", "strength": 0.88, "visibility": "shared", "reflection_level": 1}
+        },
+        "edges": []
+    }
+    with open(palace_dir / "palace.json", "w") as f:
+        json.dump(palace_json, f)
+
+    res = _read_palace(str(tmp_path))
+    assert res["room_count"] == 1
+    assert len(res["nodes"]) == 2  # 1 room + 1 memory
+    assert len(res["edges"]) == 1  # 1 link to room
+    room_node = next(n for n in res["nodes"] if n["type"] == "room")
+    mem_node = next(n for n in res["nodes"] if n["type"] == "memory")
+    assert room_node["id"] == "room:r1"
+    assert mem_node["id"] == "mem:m1"
+    assert mem_node["color"] == "#06b6d4"  # shared color
+
+
+def test_api_graph_endpoint_returns_json(tmp_path):
+    palace_dir = tmp_path / "palace"
+    palace_dir.mkdir(parents=True)
+    palace_json = {
+        "rooms": {
+            "r1": {"id": "r1", "topic": "Secret", "visibility": "private", "memory_ids": ["m1"], "visit_count": 1}
+        },
+        "memories": {
+            "m1": {"id": "m1", "content": "Private key", "room_id": "r1", "strength": 1.0, "visibility": "private", "reflection_level": 0}
+        },
+        "edges": []
+    }
+    with open(palace_dir / "palace.json", "w") as f:
+        json.dump(palace_json, f)
+
+    status, headers, body = _simulate_get(str(tmp_path), "/api/graph")
+    assert status == 200
+    assert "application/json" in headers["Content-Type"]
+    data = json.loads(body)
+    assert "nodes" in data
+    assert "edges" in data
+    assert len(data["nodes"]) == 2
+    mem_node = next(n for n in data["nodes"] if n["type"] == "memory")
+    assert mem_node["color"] == "#f59e0b"  # private color
+
+
+if __name__ == "__main__":
+    import tempfile
+    test_funcs = [
+        test_read_episodes_returns_list_of_dicts,
+        test_read_episodes_consolidated_cast_to_bool,
+        test_read_episodes_null_salience_json,
+        test_read_episodes_malformed_salience_json,
+        test_read_episodes_ordered_newest_first,
+        test_read_episodes_missing_db_returns_empty,
+        test_read_palace_nodes_and_edges,
+        test_api_episodes_endpoint_returns_json,
+        test_api_episodes_empty_when_no_db,
+        test_api_graph_endpoint_returns_json,
+    ]
+    passed = 0
+    for fn in test_funcs:
+        with tempfile.TemporaryDirectory() as td:
+            fn(Path(td))
+            passed += 1
+            print(f"✓ {fn.__name__}")
+
+    print(f"\nAll {passed} tests completed successfully.")
+
