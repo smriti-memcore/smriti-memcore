@@ -65,9 +65,72 @@ _HTML = r"""<!DOCTYPE html>
     #view-graph{flex:1;display:flex;overflow:hidden;}
     #graph-container{flex:1;position:relative;overflow:hidden;}
     svg{width:100%;height:100%;}
-    .tooltip{position:absolute;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 13px;font-size:12px;pointer-events:none;max-width:240px;line-height:1.5;z-index:100;opacity:0;transition:opacity .2s;box-shadow:0 8px 32px rgba(0,0,0,.5);}
+    .tooltip{position:absolute;background:rgba(13,17,23,0.92);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:9px;padding:10px 13px;font-size:12px;pointer-events:none;max-width:260px;line-height:1.5;z-index:100;opacity:0;transition:opacity .15s;box-shadow:0 12px 36px rgba(0,0,0,.6);}
     .tooltip.vis{opacity:1;}
-    .t-room{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}
+    .t-room{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}
+
+    /* Node and Link Aesthetics matching Smriti Webapp */
+    .node {
+      transition: r 0.2s, stroke-width 0.2s, opacity 0.2s;
+      cursor: pointer;
+    }
+    .node:hover circle {
+      stroke: #ffffff !important;
+      stroke-width: 2px !important;
+    }
+    .node.room-node circle {
+      filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.55));
+    }
+    .node.active circle {
+      stroke: #ffffff !important;
+      stroke-width: 2.5px !important;
+      filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.7)) !important;
+    }
+    .node-label {
+      font-size: 11px;
+      font-weight: 600;
+      fill: #cbd5e1;
+      pointer-events: none;
+      user-select: none;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.85);
+    }
+
+    /* Curved Links */
+    .link {
+      stroke-width: 1.4px;
+      stroke-opacity: 0.6;
+      opacity: 0.45;
+      transition: stroke-width 0.2s, opacity 0.2s, stroke 0.2s;
+      pointer-events: none;
+    }
+    .link.active {
+      stroke-width: 2.5px !important;
+      stroke-opacity: 1 !important;
+      opacity: 0.95 !important;
+      filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
+    }
+
+    /* Neural Impulse Particles */
+    .particle-dot {
+      pointer-events: none;
+      transition: r 0.25s, filter 0.25s, fill 0.25s, opacity 0.25s;
+    }
+    .particle-dot.active {
+      r: 4.5px !important;
+      fill: #ffffff !important;
+      filter: drop-shadow(0 0 5px #ffffff) drop-shadow(0 0 10px rgba(255, 255, 255, 0.7)) !important;
+    }
+
+    /* Focus dimming when a node is hovered or active */
+    svg.has-active .node:not(.active) {
+      opacity: 0.32;
+    }
+    svg.has-active .link:not(.active) {
+      opacity: 0.10;
+    }
+    svg.has-active .particle-dot:not(.active) {
+      opacity: 0.12;
+    }
 
     /* Sidebar shared */
     .sidebar{width:300px;border-left:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
@@ -192,7 +255,22 @@ _HTML = r"""<!DOCTYPE html>
         <div>👆 Click a node to inspect</div>
       </div>
       <div class="legend">
-        <div class="legend-title">Rooms</div>
+        <div class="legend-title">Node Types</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;font-size:11px;">
+          <div style="display:flex;align-items:center;gap:7px;">
+            <div style="width:11px;height:11px;border-radius:50%;background:#6366f1;box-shadow:0 0 8px rgba(99,102,241,0.6);flex-shrink:0;"></div>
+            <span style="font-weight:600;color:#cbd5e1;">🏛️ Category Room</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:#06b6d4;box-shadow:0 0 6px rgba(6,182,212,0.6);margin-left:1.5px;flex-shrink:0;"></div>
+            <span style="color:#cbd5e1;">🧠 Shared Memory</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,0.6);margin-left:1.5px;flex-shrink:0;"></div>
+            <span style="color:#cbd5e1;">🔒 Private Memory</span>
+          </div>
+        </div>
+        <div class="legend-title">Topics</div>
         <div id="legend-items"></div>
       </div>
       <div class="sh" style="border-top:1px solid var(--border)">All Memories</div>
@@ -266,7 +344,7 @@ function rc(room){return COLORS[room]||'#8b5cf6';}
 function rtc(room){return TEXT_COLORS[room]||'#a78bfa';}
 
 let graphData = {nodes:[],edges:[]};
-let simulation, svg, g, linkSel, nodeSel;
+let simulation, svg, g, linkSel, nodeSel, particleSel;
 let sortKey = 'strength', sortAsc = false;
 
 function dismissBanner() {
@@ -324,29 +402,31 @@ async function refreshData(){
   const res = await fetch('/api/graph');
   const data = await res.json();
   graphData = data;
-  updateHeader(data);
+  const memNodes = data.nodes.filter(n => n.type === 'memory' || !n.type);
+  updateHeader(data, memNodes);
   buildGraph(data);
-  buildTable(data.nodes);
-  buildStats(data);
-  buildLegend(data);
-  buildMemList(data.nodes);
+  buildTable(memNodes);
+  buildStats(data, memNodes);
+  buildLegend(data, memNodes);
+  buildMemList(memNodes);
   
   await checkPendingMemories();
 }
 
-function updateHeader(data){
+function updateHeader(data, memNodes){
   document.getElementById('storage-path').textContent = data.storage_path || '';
-  document.getElementById('hs-mems').textContent = data.nodes.length;
+  const list = memNodes || (data.nodes ? data.nodes.filter(n => n.type === 'memory' || !n.type) : []);
+  document.getElementById('hs-mems').textContent = data.stats?.total_memories ?? list.length;
   document.getElementById('hs-conns').textContent = data.edges.length;
-  document.getElementById('hs-rooms').textContent = [...new Set(data.nodes.map(n=>n.room))].length;
-  const avg = data.nodes.length ? (data.nodes.reduce((s,n)=>s+n.strength,0)/data.nodes.length).toFixed(2) : '0';
+  document.getElementById('hs-rooms').textContent = data.room_count ?? (data.stats?.total_rooms ?? [...new Set(list.map(n=>n.room))].length);
+  const avg = list.length ? (list.reduce((s,n)=>s+(n.strength||0),0)/list.length).toFixed(2) : '0';
   document.getElementById('hs-str').textContent = avg;
 }
 
 // ── Graph ───────────────────────────────────────────────────────
 function buildGraph(data){
   const container = document.getElementById('graph-container');
-  const W = container.clientWidth, H = container.clientHeight;
+  const W = container.clientWidth || 800, H = container.clientHeight || 600;
 
   svg = d3.select('#svg');
   svg.selectAll('*').remove();
@@ -362,33 +442,66 @@ function buildGraph(data){
   fm.append('feMergeNode').attr('in','cb');
   fm.append('feMergeNode').attr('in','SourceGraphic');
 
-  const zoom = d3.zoom().scaleExtent([.1,5]).on('zoom',e=>g.attr('transform',e.transform));
+  const zoom = d3.zoom().scaleExtent([.15,5]).on('zoom',e=>g.attr('transform',e.transform));
   svg.call(zoom);
   window._zoom=zoom; window._svg=svg;
 
   g = svg.append('g');
 
-  const nodes = data.nodes.map(n=>({...n, x:W/2+(Math.random()-.5)*320, y:H/2+(Math.random()-.5)*260}));
+  const nodes = data.nodes.map(n=>({
+    ...n,
+    x: W/2 + (Math.random() - .5) * 360,
+    y: H/2 + (Math.random() - .5) * 280
+  }));
   const nodeById = Object.fromEntries(nodes.map(n=>[n.id,n]));
-  const links = data.edges.map(e=>({source:nodeById[e.from],target:nodeById[e.to],weight:e.weight||.6})).filter(e=>e.source&&e.target);
+  const links = data.edges.map(e=>({
+    source: nodeById[e.from],
+    target: nodeById[e.to],
+    weight: e.weight || .6,
+    type: e.type || 'link',
+    t: Math.random(),
+    speed: 0.003 + Math.random() * 0.004,
+    is_active: false
+  })).filter(e=>e.source&&e.target);
 
-  // Cross-room edges from same-room groups (if no explicit edges)
+  // Fallback: connect memories in same room if no edges exist
   if(!links.length){
     const roomMap = {};
-    nodes.forEach(n=>{(roomMap[n.room]=roomMap[n.room]||[]).push(n);});
+    nodes.filter(n=>n.type!=='room').forEach(n=>{(roomMap[n.room]=roomMap[n.room]||[]).push(n);});
     Object.values(roomMap).forEach(mems=>{
       for(let i=0;i<mems.length;i++)for(let j=i+1;j<mems.length;j++)
-        links.push({source:mems[i],target:mems[j],weight:.5});
+        links.push({
+          source: mems[i],
+          target: mems[j],
+          weight: .5,
+          t: Math.random(),
+          speed: 0.003 + Math.random() * 0.004,
+          is_active: false
+        });
     });
   }
 
-  linkSel = g.append('g').selectAll('line').data(links).join('line')
-    .attr('stroke',d=>rc(d.source.room)+'55')
-    .attr('stroke-width',d=>(d.weight||.5)*2.2)
-    .attr('stroke-linecap','round');
+  // Draw curved links (<path>)
+  linkSel = g.append('g').attr('class','links').selectAll('path')
+    .data(links)
+    .join('path')
+    .attr('class','link')
+    .attr('stroke', d => d.source.color || (d.source.type==='room' ? '#6366f1' : 'var(--accent3)'))
+    .attr('fill','none');
 
-  nodeSel = g.append('g').selectAll('.node').data(nodes).join('g')
-    .attr('class','node')
+  // Draw neural impulse particles (synapses transmitting impulses)
+  particleSel = g.append('g').attr('class','particles').selectAll('circle')
+    .data(links)
+    .join('circle')
+    .attr('class','particle-dot')
+    .attr('r', 2.5)
+    .attr('fill', d => d.source.color || (d.source.type==='room' ? '#6366f1' : 'var(--accent3)'));
+
+  // Draw Nodes
+  nodeSel = g.append('g').attr('class','nodes').selectAll('.node')
+    .data(nodes)
+    .join('g')
+    .attr('class', d => d.type === 'room' ? 'node room-node' : 'node memory-node')
     .call(d3.drag()
       .on('start',(e,d)=>{if(!e.active)simulation.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y;})
       .on('drag', (e,d)=>{d.fx=e.x;d.fy=e.y;})
@@ -400,181 +513,365 @@ function buildGraph(data){
 
   svg.on('click',()=>clearSel());
 
-  // Halo
-  nodeSel.append('circle').attr('r',d=>20+d.strength*12).attr('fill',d=>rc(d.room)+'10').attr('stroke','none');
-  // Main circle
-  nodeSel.append('circle').attr('r',d=>12+d.strength*10).attr('fill',d=>rc(d.room)+'cc').attr('stroke',d=>rc(d.room)).attr('stroke-width',2).attr('filter','url(#glow)').style('cursor','pointer');
-  // Label
-  nodeSel.append('text').attr('y',d=>20+d.strength*10).attr('text-anchor','middle').attr('fill','#94a3b8').attr('font-size',10.5).attr('font-family','Inter,sans-serif').text(d=>d.room);
+  // Room nodes: indigo #6366f1 hub with glow
+  const roomNodes = nodeSel.filter(d => d.type === 'room');
+  roomNodes.append('circle')
+    .attr('r', 16)
+    .attr('fill', '#6366f1')
+    .attr('stroke', '#090d16')
+    .attr('stroke-width', 1.5)
+    .attr('filter', 'url(#glow)');
+
+  roomNodes.append('text')
+    .attr('class', 'node-label')
+    .attr('dx', 22)
+    .attr('dy', 5)
+    .text(d => '🏛️ ' + d.label);
+
+  // Memory satellite nodes: cyan #06b6d4 (shared) or gold #f59e0b (private)
+  const memNodesSel = nodeSel.filter(d => d.type !== 'room');
+  memNodesSel.append('circle')
+    .attr('r', d => 6 + Math.min((d.strength || 1) * 2.5, 6))
+    .attr('fill', d => d.color || '#06b6d4')
+    .attr('stroke', '#090d16')
+    .attr('stroke-width', 1.5);
 
   simulation = d3.forceSimulation(nodes)
-    .force('link',d3.forceLink(links).id(d=>d.id).distance(150).strength(.45))
-    .force('charge',d3.forceManyBody().strength(-280))
-    .force('center',d3.forceCenter(W/2,H/2))
-    .force('collision',d3.forceCollide(52))
-    .on('tick',()=>{
-      linkSel.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
-      nodeSel.attr('transform',d=>`translate(${d.x},${d.y})`);
+    .force('link', d3.forceLink(links).id(d=>d.id).distance(d => d.target.type === 'room' || d.source.type === 'room' ? 110 : 55).strength(0.5))
+    .force('charge', d3.forceManyBody().strength(-320))
+    .force('center', d3.forceCenter(W/2, H/2))
+    .force('collision', d3.forceCollide(d => d.type === 'room' ? 44 : 18))
+    .on('tick', () => {
+      // Curved quadratic Bézier lines
+      linkSel.attr('d', d => {
+        const x1 = d.source.x, y1 = d.source.y;
+        const x2 = d.target.x, y2 = d.target.y;
+        const dx = x2 - x1, dy = y2 - y1;
+        const dr = Math.sqrt(dx * dx + dy * dy);
+        if (dr === 0) return `M ${x1} ${y1} L ${x2} ${y2}`;
+        const curveFactor = 0.18;
+        const cx = (x1 + x2) / 2 - (dy / dr) * (dr * curveFactor);
+        const cy = (y1 + y2) / 2 + (dx / dr) * (dr * curveFactor);
+        return `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
+      });
+      nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
     });
 
+  // Continuous particle animation along curved synapses
+  if (window._particleTimer) window._particleTimer.stop();
+  window._particleTimer = d3.timer(() => {
+    if (!particleSel) return;
+    particleSel.each(function(d) {
+      const x1 = d.source.x, y1 = d.source.y;
+      const x2 = d.target.x, y2 = d.target.y;
+      if (x1 === undefined || y1 === undefined || x2 === undefined || y2 === undefined) return;
+      const dx = x2 - x1, dy = y2 - y1;
+      const dr = Math.sqrt(dx * dx + dy * dy);
+      if (dr === 0) {
+        d3.select(this).attr('cx', x1).attr('cy', y1);
+        return;
+      }
+      const curveFactor = 0.18;
+      const cx = (x1 + x2) / 2 - (dy / dr) * (dr * curveFactor);
+      const cy = (y1 + y2) / 2 + (dx / dr) * (dr * curveFactor);
+
+      d.t = (d.t + (d.is_active ? 0.015 : d.speed)) % 1;
+      const t = d.t;
+      const px = (1 - t) * (1 - t) * x1 + 2 * (1 - t) * t * cx + t * t * x2;
+      const py = (1 - t) * (1 - t) * y1 + 2 * (1 - t) * t * cy + t * t * y2;
+      d3.select(this).attr('cx', px).attr('cy', py);
+    });
+  });
+
   window._nodes=nodes; window._links=links; window._sim=simulation;
+  setTimeout(() => autoFit(true), 500);
 }
 
 function setLayout(mode){
   ['force','cluster'].forEach(m=>document.getElementById('btn-'+m).classList.toggle('active',m===mode));
   if(!window._sim||!window._nodes)return;
-  const W=document.getElementById('graph-container').clientWidth;
-  const H=document.getElementById('graph-container').clientHeight;
+  const W=document.getElementById('graph-container').clientWidth || 800;
+  const H=document.getElementById('graph-container').clientHeight || 600;
   if(mode==='cluster'){
-    const rooms=[...new Set(window._nodes.map(n=>n.room))];
-    const centers=Object.fromEntries(rooms.map((r,i)=>[r,{x:W/2+Math.cos(i*2*Math.PI/rooms.length)*180,y:H/2+Math.sin(i*2*Math.PI/rooms.length)*150}]));
-    window._sim.force('x',d3.forceX(d=>centers[d.room].x).strength(.3)).force('y',d3.forceY(d=>centers[d.room].y).strength(.3)).force('charge',d3.forceManyBody().strength(-80)).alphaTarget(.3).restart();
-    setTimeout(()=>window._sim.alphaTarget(0),2000);
+    const roomNodes = window._nodes.filter(n=>n.type==='room');
+    const rooms = roomNodes.map(r=>r.room_id || r.id.replace('room:',''));
+    const radius = Math.min(W, H) * 0.32;
+    const centers = Object.fromEntries(rooms.map((r,i)=>[r,{
+      x: W/2 + Math.cos(i*2*Math.PI/rooms.length) * radius,
+      y: H/2 + Math.sin(i*2*Math.PI/rooms.length) * radius
+    }]));
+    window._sim
+      .force('x', d3.forceX(d => centers[d.room_id]?.x || W/2).strength(0.35))
+      .force('y', d3.forceY(d => centers[d.room_id]?.y || H/2).strength(0.35))
+      .force('charge', d3.forceManyBody().strength(-120))
+      .alphaTarget(0.3).restart();
+    setTimeout(()=>window._sim.alphaTarget(0), 1800);
   } else {
-    const W2=document.getElementById('graph-container').clientWidth, H2=document.getElementById('graph-container').clientHeight;
-    window._sim.force('x',null).force('y',null).force('charge',d3.forceManyBody().strength(-280)).force('center',d3.forceCenter(W2/2,H2/2)).alphaTarget(.3).restart();
-    setTimeout(()=>window._sim.alphaTarget(0),2000);
+    window._sim
+      .force('x', null)
+      .force('y', null)
+      .force('charge', d3.forceManyBody().strength(-320))
+      .force('center', d3.forceCenter(W/2, H/2))
+      .alphaTarget(0.3).restart();
+    setTimeout(()=>window._sim.alphaTarget(0), 1800);
   }
 }
 
-function resetZoom(){window._svg?.transition().duration(500).call(window._zoom.transform,d3.zoomIdentity);}
-
-function selectNode(d){
-  document.querySelectorAll('.mem-item').forEach(el=>el.classList.remove('sel'));
-  const li=document.getElementById('li-'+d.id);
-  if(li){li.classList.add('sel');li.scrollIntoView({behavior:'smooth',block:'nearest'});}
-
-  const c=rc(d.room), tc=rtc(d.room);
-  const det=document.getElementById('node-detail');
-  det.className='node-detail';
-  det.innerHTML=`
-    <div class="detail-room" style="background:${c}22;color:${tc};border:1px solid ${c}44">🏛️ ${d.room}</div>
-    <div class="detail-content">${d.content}</div>
-    <div class="dmetrics">
-      <div class="dmetric"><div class="dmetric-val">${d.strength.toFixed(3)}</div><div class="dmetric-label">Strength</div></div>
-      <div class="dmetric"><div class="dmetric-val">${d.salience.toFixed(3)}</div><div class="dmetric-label">Salience</div></div>
-    </div>
-    <div class="bar-wrap"><div class="bar-label">Memory Strength</div><div class="bar-track"><div class="bar-fill" style="width:${d.strength*100}%"></div></div></div>
-    <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">
-      ID: ${d.id}<br>Status: <span style="color:${d.status==='active'?'var(--green)':'var(--gold)'}">${d.status}</span> · Accessed: ${d.access_count}×
-    </div>`;
-
-  nodeSel?.selectAll('circle:nth-child(2)').style('opacity',n=>{
-    const connected=window._links?.some(l=>(l.source.id===d.id&&l.target.id===n.id)||(l.target.id===d.id&&l.source.id===n.id));
-    return n.id===d.id||connected?1:.15;
-  });
-  linkSel?.style('opacity',l=>l.source.id===d.id||l.target.id===d.id?1:.08);
+function autoFit(animate = true){
+  if(!window._nodes || !window._nodes.length || !window._svg || !window._zoom) return;
+  const container = document.getElementById('graph-container');
+  const width = container.clientWidth || 800;
+  const height = container.clientHeight || 600;
+  const xs = window._nodes.map(n => n.x || 0);
+  const ys = window._nodes.map(n => n.y || 0);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const pad = 60;
+  const graphWidth = (maxX - minX) + pad * 2;
+  const graphHeight = (maxY - minY) + pad * 2;
+  if (graphWidth <= 0 || graphHeight <= 0) return;
+  let scale = Math.min(width / graphWidth, height / graphHeight);
+  scale = Math.min(Math.max(scale, 0.3), 1.4);
+  const midX = (minX + maxX) / 2;
+  const midY = (minY + maxY) / 2;
+  const dx = (width / 2) - scale * midX;
+  const dy = (height / 2) - scale * midY;
+  const transform = d3.zoomIdentity.translate(dx, dy).scale(scale);
+  if (animate) {
+    window._svg.transition().duration(600).call(window._zoom.transform, transform);
+  } else {
+    window._svg.call(window._zoom.transform, transform);
+  }
 }
 
-function selectById(id){const n=window._nodes?.find(n=>n.id===id);if(n)selectNode(n);}
+function resetZoom(){ autoFit(true); }
+
+function selectNode(d){
+  window._selectedId = d.id;
+  document.querySelectorAll('.mem-item').forEach(el=>el.classList.remove('sel'));
+  const rawId = d.raw_id || d.id;
+  const li = document.getElementById('li-' + rawId) || document.getElementById('li-' + d.id);
+  if(li){ li.classList.add('sel'); li.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+
+  const det = document.getElementById('node-detail');
+  det.className = 'node-detail';
+
+  if (d.type === 'room') {
+    det.innerHTML = `
+      <div class="detail-room" style="background:rgba(99,102,241,0.15);color:#818cf8;border:1px solid rgba(99,102,241,0.3)">🏛️ CATEGORY ROOM</div>
+      <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:2px">${d.label}</div>
+      <div class="dmetrics" style="margin-top:6px">
+        <div class="dmetric"><div class="dmetric-val">${d.memory_count || 0}</div><div class="dmetric-label">Memories</div></div>
+        <div class="dmetric"><div class="dmetric-val">${d.visit_count || 0}</div><div class="dmetric-label">Visits</div></div>
+      </div>
+      <div style="font-size:10.5px;color:var(--muted);font-family:var(--mono);margin-top:4px">
+        Room ID: ${d.room_id || d.id}<br>Visibility: <span style="text-transform:uppercase;color:#818cf8">${d.visibility || 'shared'}</span>
+      </div>
+    `;
+  } else {
+    const c = rc(d.room), tc = rtc(d.room);
+    const visBadgeColor = d.visibility === 'private' ? 'var(--gold)' : 'var(--accent3)';
+    const level = d.reflection_level || 0;
+    const levelNames = ["Direct", "Observation", "Insight", "Principle"];
+    const stateName = levelNames[level] || "Direct";
+    const stateColor = level === 0 ? "#22d3ee" : level === 1 ? "#c084fc" : level === 2 ? "#f472b6" : "#f59e0b";
+
+    det.innerHTML = `
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <div class="detail-room" style="background:${c}22;color:${tc};border:1px solid ${c}44">🏛️ ${d.room}</div>
+        <span style="font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:12px;background:rgba(255,255,255,0.05);color:${visBadgeColor};border:1px solid ${visBadgeColor}44;text-transform:uppercase;">${d.visibility || 'shared'}</span>
+        <span style="font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:12px;background:rgba(255,255,255,0.05);color:${stateColor};border:1px solid ${stateColor}44;text-transform:uppercase;">${stateName} (L${level})</span>
+      </div>
+      <div class="detail-content" style="margin-top:4px">${d.content}</div>
+      <div class="dmetrics">
+        <div class="dmetric"><div class="dmetric-val">${((d.strength||0)*100).toFixed(0)}%</div><div class="dmetric-label">Strength</div></div>
+        <div class="dmetric"><div class="dmetric-val">${(d.salience||0).toFixed(3)}</div><div class="dmetric-label">Salience</div></div>
+      </div>
+      <div class="bar-wrap"><div class="bar-label">Memory Retention</div><div class="bar-track"><div class="bar-fill" style="width:${Math.min((d.strength||0)*100, 100)}%"></div></div></div>
+      <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">
+        ID: ${d.raw_id || d.id}<br>Status: <span style="color:${d.status==='active'?'var(--green)':'var(--gold)'}">${d.status}</span> · Accessed: ${d.access_count||0}×
+      </div>`;
+  }
+
+  svg.classed('has-active', true);
+  nodeSel?.classed('active', n => n.id === d.id);
+  linkSel?.classed('active', l => {
+    const isActive = (l.source.id === d.id || l.target.id === d.id);
+    l.is_active = isActive;
+    return isActive;
+  });
+  particleSel?.classed('active', l => l.is_active);
+}
+
+function selectById(id){
+  const n = window._nodes?.find(n => n.id === id || n.raw_id === id || n.id === 'mem:' + id || n.id === 'room:' + id);
+  if(n) selectNode(n);
+}
 
 function clearSel(){
-  nodeSel?.selectAll('circle:nth-child(2)').style('opacity',1);
-  linkSel?.style('opacity',1);
+  window._selectedId = null;
+  svg?.classed('has-active', false);
+  nodeSel?.classed('active', false);
+  linkSel?.classed('active', false).each(l => { l.is_active = false; });
+  particleSel?.classed('active', false);
   document.querySelectorAll('.mem-item').forEach(el=>el.classList.remove('sel'));
-  const det=document.getElementById('node-detail');
-  det.className='node-detail empty';
-  det.innerHTML='<div>👆 Click a node to inspect</div>';
+  const det = document.getElementById('node-detail');
+  det.className = 'node-detail empty';
+  det.innerHTML = '<div>👆 Click a node to inspect</div>';
 }
 
 function showTip(e,d){
-  const t=document.getElementById('tooltip');
-  t.innerHTML=`<div class="t-room" style="color:${rtc(d.room)}">${d.room.toUpperCase()}</div><div style="margin-bottom:5px">${d.content.length>110?d.content.slice(0,110)+'…':d.content}</div><div style="font-size:10px;color:var(--muted)">strength <b style="color:var(--text)">${d.strength.toFixed(2)}</b> · salience <b style="color:var(--text)">${d.salience.toFixed(2)}</b></div>`;
-  t.classList.add('vis');moveTip(e);
+  const t = document.getElementById('tooltip');
+  if (d.type === 'room') {
+    t.innerHTML = `
+      <div class="t-room" style="color:#818cf8">🏛️ CATEGORY ROOM</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">${d.label}</div>
+      <div style="font-size:10px;color:var(--muted)">${d.memory_count || 0} clustered memories · ${d.visit_count || 0} visits</div>
+    `;
+  } else {
+    const strength = ((d.strength || 0) * 100).toFixed(0);
+    const level = d.reflection_level || 0;
+    const levelNames = ["Direct", "Observation", "Insight", "Principle"];
+    const stateName = levelNames[level] || "Direct";
+    const visColor = d.visibility === 'private' ? 'var(--gold)' : 'var(--accent3)';
+    t.innerHTML = `
+      <div class="t-room" style="color:${rtc(d.room)}">🧠 MEMORY NODE · <span style="color:${visColor}">${(d.visibility||'shared').toUpperCase()}</span></div>
+      <div style="margin-bottom:5px;font-size:12px;line-height:1.4">${d.content.length > 110 ? d.content.slice(0, 110) + '…' : d.content}</div>
+      <div style="font-size:10px;color:var(--muted)">Strength: <b style="color:var(--text)">${strength}%</b> · State: <b style="color:var(--text)">${stateName} (L${level})</b></div>
+    `;
+  }
+  t.classList.add('vis');
+  moveTip(e);
+
+  svg.classed('has-active', true);
+  nodeSel?.classed('active', n => n.id === d.id);
+  linkSel?.classed('active', l => {
+    const isActive = (l.source.id === d.id || l.target.id === d.id);
+    l.is_active = isActive;
+    return isActive;
+  });
+  particleSel?.classed('active', l => l.is_active);
 }
+
 function moveTip(e){
-  const t=document.getElementById('tooltip'),r=document.getElementById('graph-container').getBoundingClientRect();
-  let x=e.clientX-r.left+14,y=e.clientY-r.top-8;
-  if(x+250>r.width)x=e.clientX-r.left-260;
-  t.style.left=x+'px';t.style.top=y+'px';
+  const t = document.getElementById('tooltip'), r = document.getElementById('graph-container').getBoundingClientRect();
+  let x = e.clientX - r.left + 14, y = e.clientY - r.top - 8;
+  if(x + 260 > r.width) x = e.clientX - r.left - 270;
+  t.style.left = x + 'px'; t.style.top = y + 'px';
 }
-function hideTip(){document.getElementById('tooltip').classList.remove('vis');}
+
+function hideTip(){
+  document.getElementById('tooltip').classList.remove('vis');
+  if (!window._selectedId) {
+    svg?.classed('has-active', false);
+    nodeSel?.classed('active', false);
+    linkSel?.classed('active', false).each(l => { l.is_active = false; });
+    particleSel?.classed('active', false);
+  } else {
+    const selNode = window._nodes?.find(n => n.id === window._selectedId);
+    if (selNode) {
+      nodeSel?.classed('active', n => n.id === selNode.id);
+      linkSel?.classed('active', l => {
+        const isActive = (l.source.id === selNode.id || l.target.id === selNode.id);
+        l.is_active = isActive;
+        return isActive;
+      });
+      particleSel?.classed('active', l => l.is_active);
+    }
+  }
+}
 
 // ── Legend + mem list ───────────────────────────────────────────
-function buildLegend(data){
-  const rooms=[...new Set(data.nodes.map(n=>n.room))];
-  document.getElementById('legend-items').innerHTML=rooms.map(r=>`
-    <div class="legend-item"><div class="ldot" style="background:${rc(r)}"></div><span>${r.charAt(0).toUpperCase()+r.slice(1)}</span><span style="color:var(--muted);font-size:10px;margin-left:auto">${data.nodes.filter(n=>n.room===r).length} mems</span></div>`).join('');
+function buildLegend(data, memNodes){
+  const list = memNodes || (data.nodes ? data.nodes.filter(n => n.type === 'memory' || !n.type) : []);
+  const rooms = [...new Set(list.map(n=>n.room))];
+  document.getElementById('legend-items').innerHTML = rooms.map(r=>`
+    <div class="legend-item"><div class="ldot" style="background:${rc(r)}"></div><span>${r.charAt(0).toUpperCase()+r.slice(1)}</span><span style="color:var(--muted);font-size:10px;margin-left:auto">${list.filter(n=>n.room===r).length} mems</span></div>`).join('');
 }
 
-function buildMemList(nodes){
-  document.getElementById('mem-list').innerHTML=nodes.map(n=>`
-    <div class="mem-item" id="li-${n.id}" onclick="selectById('${n.id}')">
-      <div class="mic">${n.content.length>80?n.content.slice(0,80)+'…':n.content}</div>
-      <div class="mim"><span style="color:${rtc(n.room)}">${n.room}</span> · str ${n.strength.toFixed(2)} · sal ${n.salience.toFixed(2)}</div>
+function buildMemList(memNodes){
+  document.getElementById('mem-list').innerHTML = memNodes.map(n=>`
+    <div class="mem-item" id="li-${n.raw_id || n.id}" onclick="selectById('${n.id}')">
+      <div class="mic">${n.content.length > 80 ? n.content.slice(0, 80) + '…' : n.content}</div>
+      <div class="mim">
+        <span style="color:${n.visibility==='private'?'var(--gold)':'var(--accent3)'}">● ${n.visibility.toUpperCase()}</span> · 
+        <span style="color:${rtc(n.room)}">${n.room}</span> · str ${(n.strength||0).toFixed(2)}
+      </div>
     </div>`).join('');
 }
 
 // ── Table view ──────────────────────────────────────────────────
-let _allNodes=[];
+let _allMemories = [];
 function buildTable(nodes){
-  _allNodes=nodes;
-  const rf=document.getElementById('room-filter');
-  const rooms=[...new Set(nodes.map(n=>n.room))];
-  rf.innerHTML='<option value="">All Rooms</option>'+rooms.map(r=>`<option value="${r}">${r}</option>`).join('');
+  _allMemories = nodes;
+  const rf = document.getElementById('room-filter');
+  const rooms = [...new Set(nodes.map(n=>n.room))];
+  rf.innerHTML = '<option value="">All Rooms</option>' + rooms.map(r=>`<option value="${r}">${r}</option>`).join('');
   renderTable(nodes);
 }
 
 function filterTable(){
-  const q=document.getElementById('search-input').value.toLowerCase();
-  const r=document.getElementById('room-filter').value;
-  let filtered=_allNodes.filter(n=>{
-    const matchQ=!q||n.content.toLowerCase().includes(q)||n.room.toLowerCase().includes(q);
-    const matchR=!r||n.room===r;
-    return matchQ&&matchR;
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const r = document.getElementById('room-filter').value;
+  let filtered = _allMemories.filter(n=>{
+    const matchQ = !q || (n.content && n.content.toLowerCase().includes(q)) || (n.room && n.room.toLowerCase().includes(q));
+    const matchR = !r || n.room === r;
+    return matchQ && matchR;
   });
   renderTable(filtered);
 }
 
 function sortTable(key){
-  if(sortKey===key)sortAsc=!sortAsc;
-  else{sortKey=key;sortAsc=false;}
+  if(sortKey===key) sortAsc = !sortAsc;
+  else { sortKey = key; sortAsc = false; }
   filterTable();
 }
 
 function renderTable(nodes){
-  const sorted=[...nodes].sort((a,b)=>{
-    let av=a[sortKey],bv=b[sortKey];
-    if(typeof av==='string')av=av.toLowerCase(),bv=bv?.toLowerCase();
-    return sortAsc?(av>bv?1:-1):(av<bv?1:-1);
+  const sorted = [...nodes].sort((a,b)=>{
+    let av = a[sortKey], bv = b[sortKey];
+    if(typeof av === 'string') av = av.toLowerCase(), bv = bv?.toLowerCase();
+    return sortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
   });
-  document.getElementById('table-body').innerHTML=sorted.map(n=>`
+  document.getElementById('table-body').innerHTML = sorted.map(n=>`
     <tr onclick="showTab('graph');setTimeout(()=>selectById('${n.id}'),200)">
       <td style="max-width:340px">${n.content}</td>
       <td><span class="room-badge" style="background:${rc(n.room)}22;color:${rtc(n.room)}">${n.room}</span></td>
-      <td>${n.strength.toFixed(3)}</td>
-      <td>${n.salience.toFixed(3)}</td>
+      <td>${(n.strength||0).toFixed(3)}</td>
+      <td>${(n.salience||0).toFixed(3)}</td>
       <td><span class="${n.status==='active'?'status-ok':'status-pin'}">${n.status}</span></td>
-      <td>${n.access_count}</td>
+      <td>${n.access_count||0}</td>
     </tr>`).join('');
 }
 
 // ── Stats view ──────────────────────────────────────────────────
-function buildStats(data){
-  const nodes=data.nodes;
+function buildStats(data, memNodes){
+  const nodes = memNodes || (data.nodes ? data.nodes.filter(n => n.type === 'memory' || !n.type) : []);
   if(!nodes.length){document.getElementById('stats-content').innerHTML='<p style="color:var(--muted)">No memories yet.</p>';return;}
-  const rooms=[...new Set(nodes.map(n=>n.room))];
-  const avgStr=(nodes.reduce((s,n)=>s+n.strength,0)/nodes.length).toFixed(3);
-  const avgSal=(nodes.reduce((s,n)=>s+n.salience,0)/nodes.length).toFixed(3);
-  const pinned=nodes.filter(n=>n.status==='pinned').length;
-  const archived=nodes.filter(n=>n.status==='archived').length;
-  const totalAccess=nodes.reduce((s,n)=>s+n.access_count,0);
+  const rooms = [...new Set(nodes.map(n=>n.room))];
+  const avgStr = (nodes.reduce((s,n)=>s+(n.strength||0),0)/nodes.length).toFixed(3);
+  const avgSal = (nodes.reduce((s,n)=>s+(n.salience||0),0)/nodes.length).toFixed(3);
+  const pinned = nodes.filter(n=>n.status==='pinned').length;
+  const archived = nodes.filter(n=>n.status==='archived').length;
+  const privCount = nodes.filter(n=>n.visibility==='private').length;
+  const sharedCount = nodes.filter(n=>n.visibility!=='private').length;
+  const totalAccess = nodes.reduce((s,n)=>s+(n.access_count||0),0);
 
-  const roomStats=rooms.map(r=>{
-    const mems=nodes.filter(n=>n.room===r);
-    const avg=(mems.reduce((s,n)=>s+n.strength,0)/mems.length).toFixed(2);
+  const roomStats = rooms.map(r=>{
+    const mems = nodes.filter(n=>n.room===r);
+    const avg = (mems.reduce((s,n)=>s+(n.strength||0),0)/mems.length).toFixed(2);
     return {room:r, count:mems.length, avg, color:rc(r)};
   });
 
-  document.getElementById('stats-content').innerHTML=`
+  document.getElementById('stats-content').innerHTML = `
     <div class="stats-grid">
       <div class="stat-card"><div class="sc-val">${nodes.length}</div><div class="sc-label">Total Memories</div></div>
-      <div class="stat-card"><div class="sc-val">${data.edges.length}</div><div class="sc-label">Connections</div></div>
-      <div class="stat-card"><div class="sc-val">${rooms.length}</div><div class="sc-label">Rooms</div></div>
+      <div class="stat-card"><div class="sc-val">${data.edges.length}</div><div class="sc-label">Synaptic Links</div></div>
+      <div class="stat-card"><div class="sc-val">${data.room_count || rooms.length}</div><div class="sc-label">Category Rooms</div></div>
       <div class="stat-card"><div class="sc-val">${avgStr}</div><div class="sc-label">Avg Memory Strength</div></div>
       <div class="stat-card"><div class="sc-val">${avgSal}</div><div class="sc-label">Avg Salience Score</div></div>
       <div class="stat-card"><div class="sc-val">${pinned}</div><div class="sc-label">Pinned Memories</div><div class="sc-sub">Never forgotten</div></div>
-      <div class="stat-card"><div class="sc-val">${archived}</div><div class="sc-label">Archived</div></div>
+      <div class="stat-card"><div class="sc-val">${privCount} / ${sharedCount}</div><div class="sc-label">Private / Shared</div><div class="sc-sub">Vault segregation</div></div>
       <div class="stat-card"><div class="sc-val">${totalAccess}</div><div class="sc-label">Total Recalls</div></div>
     </div>
     <div class="section-title">Rooms Breakdown</div>
@@ -595,7 +892,9 @@ function showTab(tab){
     document.getElementById('tab-'+t).classList.toggle('active',t===tab);
     document.getElementById('view-'+t).style.display=t===tab?'flex':'none';
   });
-  if(tab==='graph'&&window._nodes){buildGraph(graphData);}
+  if(tab==='graph'&&window._nodes){
+    setTimeout(()=>autoFit(false), 50);
+  }
   if(tab==='episodes'&&!episodesLoaded){buildEpisodes();}
 }
 
@@ -639,55 +938,166 @@ refreshData().catch(console.error);
 # ── Data reader — reads palace.json directly, no embeddings loaded ─────────────
 
 def _read_palace(storage_path: str) -> dict:
-    """Parse palace.json and return graph-ready dict."""
+    """Parse palace.json and return graph-ready dict with category room hubs and memory satellites."""
     palace_file = Path(storage_path).expanduser() / "palace" / "palace.json"
     if not palace_file.exists():
-        return {"nodes": [], "edges": [], "storage_path": str(palace_file)}
+        return {
+            "nodes": [],
+            "edges": [],
+            "memories": [],
+            "rooms": [],
+            "storage_path": str(palace_file),
+            "room_count": 0,
+            "stats": {"total_memories": 0, "total_rooms": 0},
+        }
 
     with open(palace_file) as f:
         raw = json.load(f)
 
-    memories = raw.get("memories", {})
-    rooms = raw.get("rooms", {})
-    room_by_id = {r["id"]: r["topic"] for r in rooms.values()}
+    raw_memories = raw.get("memories", {})
+    raw_rooms = raw.get("rooms", {})
+
+    room_by_id = {}
+    room_list = []
+    for rid, r in raw_rooms.items():
+        r_id = r.get("id", rid) if isinstance(r, dict) else rid
+        topic = r.get("topic", rid) if isinstance(r, dict) else str(r)
+        room_by_id[r_id] = topic
+        room_list.append({
+            "id": r_id,
+            "topic": topic,
+            "visibility": r.get("visibility", "shared") if isinstance(r, dict) else "shared",
+            "memory_ids": r.get("memory_ids", []) if isinstance(r, dict) else [],
+            "visit_count": r.get("visit_count", 0) if isinstance(r, dict) else 0,
+        })
+
+    # If no rooms exist but memories do, synthesize a General room
+    if not room_list and raw_memories:
+        room_list.append({
+            "id": "general",
+            "topic": "General",
+            "visibility": "shared",
+            "memory_ids": list(raw_memories.keys()),
+            "visit_count": 1,
+        })
+        room_by_id["general"] = "General"
 
     nodes = []
-    for mem_id, mem in memories.items():
-        sal = mem.get("salience", {})
-        # Use pre-computed weighted composite stored in palace.json (avoids wrong plain-mean recalculation)
-        composite = sal.get("composite", 0.0)
-
+    # 1. Add Room Nodes (Hubs) — indigo #6366f1
+    for r in room_list:
         nodes.append({
-            "id": mem["id"],
-            "content": mem["content"],
-            "room": room_by_id.get(mem.get("room_id", ""), "general"),
-            "strength": round(mem.get("strength", 1.0), 4),
+            "id": f"room:{r['id']}",
+            "room_id": r["id"],
+            "label": r["topic"],
+            "topic": r["topic"],
+            "type": "room",
+            "val": 16,
+            "color": "#6366f1",
+            "visibility": r.get("visibility", "shared"),
+            "memory_count": len(r.get("memory_ids", [])),
+            "visit_count": r.get("visit_count", 0),
+        })
+
+    # 2. Add Memory Nodes (Satellites) — cyan #06b6d4 (shared) or gold #f59e0b (private)
+    mem_list = []
+    for mem_id, mem in raw_memories.items():
+        mid = mem.get("id", mem_id)
+        sal = mem.get("salience", {})
+        composite = sal.get("composite", 0.0) if isinstance(sal, dict) else 0.0
+        room_id = mem.get("room_id", "")
+        room_topic = room_by_id.get(room_id, "General")
+        visibility = mem.get("visibility", "shared")
+        reflection_level = mem.get("reflection_level", 0)
+        strength = round(mem.get("strength", 1.0), 4)
+
+        # In Smriti Webapp: private = #f59e0b (amber/gold), shared = #06b6d4 (cyan)
+        node_color = "#f59e0b" if visibility == "private" else "#06b6d4"
+
+        mem_dict = {
+            "id": f"mem:{mid}",
+            "raw_id": mid,
+            "content": mem.get("content", ""),
+            "label": (mem.get("content", "")[:35] + "...") if len(mem.get("content", "")) > 35 else mem.get("content", ""),
+            "room": room_topic,
+            "room_id": room_id or (room_list[0]["id"] if room_list else "general"),
+            "type": "memory",
+            "strength": strength,
             "salience": round(composite, 4),
             "status": mem.get("status", "active"),
+            "visibility": visibility,
+            "reflection_level": reflection_level,
+            "color": node_color,
+            "val": 6 + round(strength * 2.5, 1),
             "access_count": mem.get("access_count", 0),
             "created": mem.get("creation_time", ""),
             "last_accessed": mem.get("last_accessed", ""),
-        })
+            "associations": mem.get("associations", []),
+        }
+        nodes.append(mem_dict)
+        mem_list.append(mem_dict)
 
-    # Build edges from rooms (memories in same room are connected)
+    # 3. Add Edges (curved synapses)
     edges = []
-    room_members: dict = {}
-    for n in nodes:
-        room_members.setdefault(n["room"], []).append(n["id"])
-    for room, members in room_members.items():
-        for i in range(len(members)):
-            for j in range(i + 1, len(members)):
-                edges.append({"from": members[i], "to": members[j], "weight": 0.65, "room": room})
+    room_node_ids = {n["id"] for n in nodes if n["type"] == "room"}
+    mem_node_ids = {n["id"] for n in nodes if n["type"] == "memory"}
 
-    # Also add explicit palace edges
+    # Connect each memory to its parent category room
+    for m in mem_list:
+        target_room = f"room:{m['room_id']}"
+        if target_room in room_node_ids:
+            edges.append({
+                "from": m["id"],
+                "to": target_room,
+                "weight": 0.85,
+                "type": "room_member",
+            })
+        elif room_node_ids:
+            fallback = next(iter(room_node_ids))
+            edges.append({
+                "from": m["id"],
+                "to": fallback,
+                "weight": 0.5,
+                "type": "room_member",
+            })
+
+        # Connect memory associations
+        for assoc_id in m.get("associations", []):
+            target_mem = f"mem:{assoc_id}"
+            if target_mem in mem_node_ids:
+                edges.append({
+                    "from": m["id"],
+                    "to": target_mem,
+                    "weight": 0.65,
+                    "type": "association",
+                })
+
+    # Add explicit palace edges (e.g. room-to-room bridges or cross edges)
     for edge in raw.get("edges", []):
-        edges.append({"from": edge.get("from"), "to": edge.get("to"), "weight": edge.get("weight", 0.7), "room": "cross"})
+        src = edge.get("source") or edge.get("from")
+        tgt = edge.get("target") or edge.get("to")
+        if not src or not tgt:
+            continue
+        src_id = f"room:{src}" if f"room:{src}" in room_node_ids else (f"mem:{src}" if f"mem:{src}" in mem_node_ids else src)
+        tgt_id = f"room:{tgt}" if f"room:{tgt}" in room_node_ids else (f"mem:{tgt}" if f"mem:{tgt}" in mem_node_ids else tgt)
+        edges.append({
+            "from": src_id,
+            "to": tgt_id,
+            "weight": edge.get("weight", edge.get("strength", 0.7)),
+            "relationship": edge.get("relationship", "cross"),
+            "type": "cross",
+        })
 
     return {
         "nodes": nodes,
         "edges": edges,
+        "memories": mem_list,
+        "rooms": room_list,
         "storage_path": str(palace_file),
-        "room_count": len(rooms),
+        "room_count": len(room_list),
+        "stats": {
+            "total_memories": len(mem_list),
+            "total_rooms": len(room_list),
+        },
     }
 
 
