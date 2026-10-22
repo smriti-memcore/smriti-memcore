@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.28] - 2026-10-22
+
+### Added
+- **Smriti Webapp Graph Visualization**: Modernized `smriti ui` memory graph with Category Room hub nodes, memory satellite clustering, curved quadratic Bézier synapses, and real-time neural impulse particle dot flow.
+- **Interactive Dual Inspector**: Inspect category rooms and memory nodes with retention strength bars, status indicators, and background dimming.
+- **Living Mentors Hub**: Multimodal coursework bundle compiler (`smriti pack`), interactive terminal chat, and real-time token streaming.
+
+### Fixed
+- **UI Server Test Architecture**: Zero-socket in-memory handler testing for deterministic CI runs and sandboxed environments.
+
 ## [1.4.27] - 2026-10-22
 
 ### Fixed
