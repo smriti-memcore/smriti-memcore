@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  🌐 <a href="https://www.smriti-memcore.com"><strong>www.smriti-memcore.com</strong></a>
+  <a href="https://www.smriti-memcore.com"><strong>www.smriti-memcore.com</strong></a>
 </p>
 
 [![PyPI](https://img.shields.io/pypi/v/smriti-memcore.svg)](https://pypi.org/project/smriti-memcore/)
@@ -23,12 +23,12 @@
 </p>
 
 <p align="center">
-  <em>⚡ <strong>Interactive Semantic Palace Graph Browser (<code>smriti ui</code>)</strong> — Category Room hub clustering, neural synaptic particle flow, and real-time dual inspector. <a href="https://github.com/smriti-memcore/smriti-memcore/releases/download/v1.4.28/smriti_ui_demo.mp4">▶ Watch Full-Res Video</a></em>
+  <em><strong>Interactive Semantic Palace Graph Browser (<code>smriti ui</code>)</strong> — Category Room hub clustering, neural synaptic particle flow, and real-time dual inspector. <a href="https://github.com/smriti-memcore/smriti-memcore/releases/download/v1.4.28/smriti_ui_demo.mp4">Watch Full-Res Video</a></em>
 </p>
 
 ---
 
-## 💡 What is SMRITI?
+## What is SMRITI?
 
 SMRITI is a high-performance, neuro-inspired long-term memory layer designed to give AI agents persistent, adaptive recall without blocking their real-time execution loop. 
 
@@ -38,7 +38,7 @@ Inspired by human Dual-Process cognitive theory, SMRITI splits memory operations
 
 ---
 
-## ⚔️ SMRITI vs. Naive RAG & Vector Databases
+## SMRITI vs. Naive RAG & Vector Databases
 
 | Feature | Naive RAG / Vector DBs | SMRITI Memory Engine |
 |---|---|---|
@@ -50,20 +50,20 @@ Inspired by human Dual-Process cognitive theory, SMRITI splits memory operations
 
 ---
 
-## 🚀 Key Capabilities
+## Key Capabilities
 
-*   🧠 **Dual-Process Performance**: Zero-blocking real-time loops. Write immediately, analyze when idle.
-*   🎭 **Persona Palaces & On-Demand Hub**: Download pre-curated cognitive memory palaces for historical figures (e.g., Albert Einstein, Isaac Newton) and converse with them with authentic mental models.
-*   🔒 **Privacy-First (Private Rooms)**: Create local semantic rooms whose memories are automatically excluded from shared/team-wide sync.
-*   🔌 **Model Context Protocol (MCP)**: Native MCP server integration with Claude Code, Claude Desktop, Gemini Antigravity, and Codex.
-*   📦 **AMP v1.0 Spec Compliant**: Drop-in compatibility with any agent framework conforming to the Agent Memory Protocol.
-*   📊 **Visual Graph Explorer**: Clean D3.js-based visualization interface with Prometheus metrics monitoring.
-*   📂 **Obsidian Vault Integration**: Automatically syncs your agent's memory graph into an Obsidian vault for human curation.
-*   🧩 **Framework Agnostic**: Integrates natively with LangChain, LlamaIndex, CrewAI, and AutoGen.
+*   **Dual-Process Performance**: Zero-blocking real-time loops. Write immediately, analyze when idle.
+*   **Persona Palaces & On-Demand Hub**: Download pre-curated cognitive memory palaces for historical figures (e.g., Albert Einstein, Isaac Newton) and converse with them with authentic mental models.
+*   **Privacy-First (Private Rooms)**: Create local semantic rooms whose memories are automatically excluded from shared/team-wide sync.
+*   **Model Context Protocol (MCP)**: Native MCP server integration with Claude Code, Claude Desktop, Gemini Antigravity, and Codex.
+*   **AMP v1.0 Spec Compliant**: Drop-in compatibility with any agent framework conforming to the Agent Memory Protocol.
+*   **Visual Graph Explorer**: Clean D3.js-based visualization interface with Prometheus metrics monitoring.
+*   **Obsidian Vault Integration**: Automatically syncs your agent's memory graph into an Obsidian vault for human curation.
+*   **Framework Agnostic**: Integrates natively with LangChain, LlamaIndex, CrewAI, and AutoGen.
 
 ---
 
-## 🧠 Core Architecture
+## Core Architecture
 
 ```text
                            ┌─────────────────────────────────┐
@@ -95,7 +95,7 @@ Inspired by human Dual-Process cognitive theory, SMRITI splits memory operations
 
 ---
 
-## 🏁 Quick Start
+## Quick Start
 
 ### 1. Install SMRITI
 
@@ -147,7 +147,7 @@ smriti chat cs101 --model qwen3.5
 * **Socratic Pedagogy**: Rather than simply giving away homework answers, the course persona guides students step-by-step from first principles using course analogies.
 * **100% Local & Private**: All conversations stay on the student's laptop—zero student data is sent to external servers.
 
-#### 🌐 Pre-Curated Mentors in Official Registry
+#### Pre-Curated Mentors in Official Registry
 You can also explore out-of-the-box mentors right away:
 ```bash
 # List all available mentors and locally installed bundles
@@ -237,7 +237,7 @@ for mem in memories:
 
 ---
 
-## 🛠️ MCP Tool Reference
+## MCP Tool Reference
 
 SMRITI exposes **19 tools** (13 native + 6 AMP aliases) for clients:
 
@@ -272,7 +272,7 @@ These endpoints ensure complete conformance with the standard Agent Memory Proto
 
 ---
 
-## 🔌 Framework Integrations
+## Framework Integrations
 
 ### LangChain Integration
 Use `SmritiLangChainMemory` as a drop-in replacement for default chat buffers. It limits active context using Working Memory and offloads the conversational history to the Semantic Palace graph in the background.
@@ -294,7 +294,7 @@ conversation.predict(input="I prefer backend APIs in Python.")
 
 ---
 
-## 📊 Benchmarks & Performance
+## Benchmarks & Performance
 
 ### 1. LoCoMo (Multi-System Context Retrieval)
 Tested against four architectures on the [LoCoMo](https://github.com/snap-research/locomo) long-context dialogue dataset (28 turns, 15 evaluation questions):
@@ -319,7 +319,7 @@ Evaluated over 50+ chat sessions using the [LongMemEval](https://github.com/xiao
 
 ---
 
-## ⚙️ Configuration Parameters
+## Configuration Parameters
 
 Initialize `SmritiConfig` with custom parameters to tune the cognitive weights:
 
@@ -346,7 +346,7 @@ config = SmritiConfig(
 
 ---
 
-## 📄 Citation
+## Citation
 
 If you use SMRITI in your research, please cite our technical paper:
 
@@ -361,6 +361,6 @@ If you use SMRITI in your research, please cite our technical paper:
 
 ---
 
-## 📄 License
+## License
 
 SMRITI is licensed under the MIT License. See [LICENSE](LICENSE) for details.
