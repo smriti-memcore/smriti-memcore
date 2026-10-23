@@ -16,6 +16,16 @@
 
 <!-- mcp-name: io.github.smriti-memcore/smriti-memory -->
 
+<p align="center">
+  <a href="https://github.com/smriti-memcore/smriti-memcore/releases/download/v1.4.28/smriti_ui_demo.mp4">
+    <img src="figures/smriti_ui_demo.gif" alt="SMRITI Memory Browser & Graph Explorer Demo" width="100%" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" />
+  </a>
+</p>
+
+<p align="center">
+  <em>⚡ <strong>Interactive Semantic Palace Graph Browser (<code>smriti ui</code>)</strong> — Category Room hub clustering, neural synaptic particle flow, and real-time dual inspector. <a href="https://github.com/smriti-memcore/smriti-memcore/releases/download/v1.4.28/smriti_ui_demo.mp4">▶ Watch Full-Res Video</a></em>
+</p>
+
 ---
 
 ## 💡 What is SMRITI?
