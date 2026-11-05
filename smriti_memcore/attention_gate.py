@@ -93,6 +93,10 @@ class AttentionGate:
         has_instruction = any(w in content_lower for w in [
             "always", "never", "must", "should", "remember", "important",
             "don't forget", "note that", "key point",
+            "use table", "output json", "format as", "in markdown",
+            "code block", "syntax highlighting", "strictly", "only and only",
+            "avoid", "do not include", "keep answer", "from now on",
+            "libraries are used", "suggest i use", "guidelines", "constraint",
         ])
         has_code = "```" in content or "def " in content or "class " in content
         has_error = any(w in content_lower for w in [
@@ -229,6 +233,19 @@ class AttentionGate:
             salience=salience,
             source=source,
         )
+
+        # Detect behavioral instructions/constraints to pin
+        content_lower = content.lower()
+        if any(w in content_lower for w in [
+            "always", "never", "must", "should", "remember", "important",
+            "don't forget", "note that", "key point",
+            "use table", "output json", "format as", "in markdown",
+            "code block", "syntax highlighting", "strictly", "only and only",
+            "avoid", "do not include", "keep answer", "from now on",
+            "guidelines", "constraint", "format in",
+        ]):
+            episode.metadata["is_instruction"] = True
+            episode.metadata["pinned"] = True
 
         logger.debug(
             f"Encoded ({decision}, salience={salience.composite:.2f}): "

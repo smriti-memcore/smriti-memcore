@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable, Dict, List, Optional
 
-from smriti_memcore.models import Memory
+from smriti_memcore.models import Memory, MemoryStatus
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,10 @@ class WorkingMemory:
         
         Returns the EvictionRecord if an eviction occurred, None otherwise.
         """
-        if priority is None:
+        is_pinned = (memory.status == MemoryStatus.PINNED or memory.metadata.get("pinned", False))
+        if is_pinned:
+            priority = max(priority or 0.0, 1000.0)
+        elif priority is None:
             priority = self._compute_priority(memory)
 
         # Deduplicate — if already present, update priority instead
@@ -69,9 +72,16 @@ class WorkingMemory:
         eviction = None
 
         if len(self._slots) >= self.max_slots:
-            # Evict lowest-priority entry
-            self._slots.sort(key=lambda s: s.priority)
-            evicted_slot = self._slots.pop(0)
+            # Evict lowest-priority UNPINNED entry if possible
+            unpinned = [s for s in self._slots if s.memory.status != MemoryStatus.PINNED and not s.memory.metadata.get("pinned", False)]
+            if unpinned:
+                unpinned.sort(key=lambda s: s.priority)
+                evicted_slot = unpinned[0]
+                self._slots.remove(evicted_slot)
+            else:
+                self._slots.sort(key=lambda s: s.priority)
+                evicted_slot = self._slots.pop(0)
+
             eviction = EvictionRecord(
                 memory_id=evicted_slot.memory.id,
                 content_preview=evicted_slot.memory.content[:100],

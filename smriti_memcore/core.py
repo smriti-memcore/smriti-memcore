@@ -171,6 +171,13 @@ class SMRITI:
             confidence=1.0 if source == MemorySource.USER_STATED else 0.8,
         )
 
+        if episode.metadata.get("pinned", False):
+            memory.status = MemoryStatus.PINNED
+            memory.metadata["pinned"] = True
+            if episode.metadata.get("is_instruction", False):
+                memory.metadata["is_instruction"] = True
+            self.working_memory.admit(memory, priority=1000.0)
+
         room = self.palace.place_memory(memory)
 
         try:
