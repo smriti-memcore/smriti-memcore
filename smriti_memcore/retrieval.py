@@ -8,6 +8,7 @@ difficulty bonus.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from collections import defaultdict, deque
 from datetime import datetime
@@ -17,7 +18,7 @@ import numpy as np
 
 from smriti_memcore.fts_index import FTSIndex
 
-from smriti_memcore.models import Memory, SmritiConfig
+from smriti_memcore.models import Memory, SmritiConfig, MemoryStatus
 from smriti_memcore.palace import SemanticPalace
 from smriti_memcore.working_memory import WorkingMemory
 from smriti_memcore.vector_store import VectorStore
@@ -111,7 +112,25 @@ class RetrievalEngine:
 
         # Sort by composite retrieval score
         candidates.sort(key=lambda m: m.retrieval_score, reverse=True)
-        selected = candidates[:top_k]
+
+        # Chronological / Linked-List Traversal for timeline or sequence queries
+        if self._is_chronological_query(query):
+            top_candidates = candidates[:top_k]
+            top_candidates.sort(key=self._extract_timeline_key)
+            selected = top_candidates
+        else:
+            selected = candidates[:top_k]
+
+        # Instruction Pinned Slots: surface active behavioral constraints if queried
+        if self._is_instruction_query(query):
+            pinned_instructions = [
+                s.memory for s in self.working_memory._slots
+                if s.memory.status == MemoryStatus.PINNED or s.memory.metadata.get("is_instruction", False)
+            ]
+            for pin_mem in reversed(pinned_instructions):
+                if pin_mem not in selected:
+                    selected.insert(0, pin_mem)
+            selected = selected[:top_k]
 
         # 3. THE KEY INNOVATION: Retrieval strengthens the memory
         for memory in selected:
@@ -157,6 +176,55 @@ class RetrievalEngine:
         if memory:
             memory.reinforce(self.config.reinforcement_factor)
         return memory
+
+    @staticmethod
+    def _is_chronological_query(query: str) -> bool:
+        """Detect whether query asks for chronological order, event sequences, or timelines."""
+        patterns = [
+            r"\bin what order\b",
+            r"\border in which\b",
+            r"\bchronological\b",
+            r"\bsequence of events\b",
+            r"\bwalk me through the order\b",
+            r"\bfirst.*second.*third\b",
+            r"\btimeline\b",
+            r"\border of events\b",
+            r"\blist the order\b",
+            r"\bprogression of\b",
+            r"\bwhat happened first\b",
+            r"\bwhat order did\b",
+        ]
+        q_lower = query.lower()
+        return any(re.search(p, q_lower) for p in patterns)
+
+    @staticmethod
+    def _extract_timeline_key(m: Memory) -> float:
+        """Extract a chronological timestamp or turn order key from a memory."""
+        # 1. Explicit metadata
+        if "turn_id" in m.metadata:
+            try:
+                return float(m.metadata["turn_id"])
+            except (ValueError, TypeError):
+                pass
+        # 2. Pattern [Turn 42 | ...]
+        match = re.search(r"\[Turn\s+(\d+)", m.content)
+        if match:
+            return float(match.group(1))
+        # 3. Fallback to creation_time timestamp
+        if m.creation_time:
+            return m.creation_time.timestamp()
+        return 0.0
+
+    @staticmethod
+    def _is_instruction_query(query: str) -> bool:
+        """Detect if the query asks for instructions, formatting rules, or operational constraints."""
+        patterns = [
+            r"\b(how to implement|how do i|how should i|show me how|what rules|instructions?)\b",
+            r"\b(format|table|json|markdown|syntax|code blocks?)\b",
+            r"\b(what libraries|what tools|dependencies)\b",
+        ]
+        q_lower = query.lower()
+        return any(re.search(p, q_lower) for p in patterns)
 
     # ── Scoring ──────────────────────────────────────────
 
