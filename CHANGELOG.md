@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.29] - 2026-11-04
+
+### Added
+- **BEAM Benchmark Evaluation Harness**: Comprehensive benchmark runner in `benchmarks/beam_eval.py` evaluating long-term agent memory across 100K, 500K, and 1M token splits on the BEAM benchmark (ICLR 2026, Tavakoli et al.).
+- **Instruction Pinned Slots**: Automatic behavioral constraint and formatting rule detection during Attention Gate processing (`attention_gate.py`), pinned to working memory with capacity eviction protection (`working_memory.py`) and retrieval prioritization (`retrieval.py`).
+- **Chronological / Linked-List Traversal**: Sequence and ordinal intent detection (`_is_chronological_query`) in `retrieval.py` that sorts candidate memories along temporal anchors (`[Turn X]` headers, metadata, creation timestamps) for accurate timeline reasoning.
+
 ## [1.4.28] - 2026-10-22
 
 ### Added
